@@ -243,9 +243,9 @@ public class CacheLongKeyLIRS<V> {
      * @return the value, or null if there is no resident entry
      */
     public V get(long key) {
-        int hash = getHash(key);
-        Segment<V> s = getSegment(hash);
-        Entry<V> e = s.find(key, hash);
+        int hash = getHash(key); // 根据 key 计算 hash
+        Segment<V> s = getSegment(hash); // 根据 hash 定位到 segment
+        Entry<V> e = s.find(key, hash); // 从 segment 里获取 entry
         return s.get(e);
     }
 
@@ -972,8 +972,8 @@ public class CacheLongKeyLIRS<V> {
          * @return the entry (might be a non-resident)
          */
         Entry<V> find(long key, int hash) {
-            int index = hash & mask;
-            Entry<V> e = entries[index];
+            int index = hash & mask; // 根据 hash 计算下标
+            Entry<V> e = entries[index]; // 获取 entries 数组对应下标里的 entry
             while (e != null && e.key != key) {
                 e = e.mapNext;
             }

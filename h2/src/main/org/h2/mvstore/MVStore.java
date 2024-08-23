@@ -254,7 +254,7 @@ public final class MVStore implements AutoCloseable {
         FileStore<?> fileStore = (FileStore<?>) config.get("fileStore");
         boolean fileStoreShallBeOpen = false;
         if (fileStore == null) {
-            if (fileName != null) {
+            if (fileName != null) { // 没指定 fileStore 参数，但是指定了 fileName，默认使用 SingleFileStore 
                 fileStore = new SingleFileStore(config);
                 fileStoreShallBeOpen = true;
             }
@@ -272,7 +272,7 @@ public final class MVStore implements AutoCloseable {
                 (UncaughtExceptionHandler)config.get("backgroundExceptionHandler");
         if (fileStore != null) {
             // 19 KB memory is about 1 KB storage
-            int kb = Math.max(1, Math.min(19, Utils.scaleForAvailableMemory(64))) * 1024;
+            int kb = Math.max(1, Math.min(19, Utils.scaleForAvailableMemory(64))) * 1024; // 根据可用内存调整自动提交缓冲区大小
             kb = DataUtils.getConfigParam(config, "autoCommitBufferSize", kb);
             autoCommitMemory = kb * 1024;
             char[] encryptionKey = (char[]) config.remove("encryptionKey");
@@ -283,10 +283,10 @@ public final class MVStore implements AutoCloseable {
             try {
                 if (fileStoreShallBeOpen) {
                     boolean readOnly = config.containsKey("readOnly");
-                    fileStore.open(fileName, readOnly, encryptionKey);
+                    fileStore.open(fileName, readOnly, encryptionKey); // 打开文件存储
                 }
-                fileStore.bind(this);
-                metaMap = fileStore.start();
+                fileStore.bind(this); // 绑定文件存储到当前 mvStore 实例
+                metaMap = fileStore.start(); // 启动文件存储，返回 MVMap
             } catch (MVStoreException e) {
                 panic(e);
             } finally {
@@ -387,7 +387,7 @@ public final class MVStore implements AutoCloseable {
      */
     public static MVStore open(String fileName) {
         HashMap<String, Object> config = new HashMap<>();
-        config.put("fileName", fileName);
+        config.put("fileName", fileName); // 指定 mvStore 的文件名配置
         return new MVStore(config);
     }
 

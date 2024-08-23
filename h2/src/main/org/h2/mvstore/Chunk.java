@@ -68,12 +68,12 @@ public abstract class Chunk<C extends Chunk<C>> {
     public final int id;
 
     /**
-     * The start block number within the file.
+     * The start block number within the file.当前 chunk 对应的起始 block number
      */
     public volatile long block;
 
     /**
-     * The length in number of blocks.
+     * The length in number of blocks.当前 chunk 对应的 block 数量
      */
     public int len;
 

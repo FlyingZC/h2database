@@ -190,12 +190,12 @@ public final class RootReference<K,V> {
     }
 
     private boolean isFree() {
-        return holdCount == 0;
+        return holdCount == 0; // 加锁数量为0
     }
 
 
     private boolean canUpdate() {
-        return isFree() || ownerId == Thread.currentThread().getId();
+        return isFree() || ownerId == Thread.currentThread().getId(); // 没加锁 or 锁被当前线程持有
     }
 
     public boolean isLockedByCurrentThread() {

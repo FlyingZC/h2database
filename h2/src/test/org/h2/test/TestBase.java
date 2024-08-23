@@ -54,7 +54,7 @@ public abstract class TestBase {
     /**
      * The base directory.
      */
-    public static final String BASE_TEST_DIR = "./data";
+    public static final String BASE_TEST_DIR = "~/h2_test/data";
 
     /**
      * An id used to create unique file names.

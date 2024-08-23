@@ -220,29 +220,29 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     protected FileStore(Map<String, Object> config) {
-        recoveryMode = config.containsKey("recoveryMode");
-        autoCompactFillRate = DataUtils.getConfigParam(config, "autoCompactFillRate", 90);
-        CacheLongKeyLIRS.Config cc = null;
-        int mb = DataUtils.getConfigParam(config, "cacheSize", 16);
+        recoveryMode = config.containsKey("recoveryMode"); // 恢复模式
+        autoCompactFillRate = DataUtils.getConfigParam(config, "autoCompactFillRate", 90); // 自动压缩填充率
+        CacheLongKeyLIRS.Config cc = null; // 缓存配置
+        int mb = DataUtils.getConfigParam(config, "cacheSize", 16); // cacheSize 默认 16mb
         if (mb > 0) {
-            cc = new CacheLongKeyLIRS.Config();
-            cc.maxMemory = mb * 1024L * 1024L;
+            cc = new CacheLongKeyLIRS.Config(); // 初始化缓存配置
+            cc.maxMemory = mb * 1024L * 1024L; // 将缓存大小转换为字节byte
             Object o = config.get("cacheConcurrency");
             if (o != null) {
                 cc.segmentCount = (Integer)o;
             }
         }
-        cache = cc == null ? null : new CacheLongKeyLIRS<>(cc);
+        cache = cc == null ? null : new CacheLongKeyLIRS<>(cc); // 根据缓存配置,初始化缓存实例
 
-        CacheLongKeyLIRS.Config cc2 = new CacheLongKeyLIRS.Config();
+        CacheLongKeyLIRS.Config cc2 = new CacheLongKeyLIRS.Config(); // 初始化 chunks 缓存配置 cc2
         cc2.maxMemory = 1024L * 1024L;
-        chunksToC = new CacheLongKeyLIRS<>(cc2);
+        chunksToC = new CacheLongKeyLIRS<>(cc2); // chunks 缓存
 
         int maxPageSize = Integer.MAX_VALUE;
         // Make sure pages will fit into cache
         if (cache != null) {
             maxPageSize = 16 * 1024;
-            int maxCacheableSize = (int) (cache.getMaxItemSize() >> 4);
+            int maxCacheableSize = (int) (cache.getMaxItemSize() >> 4); // 获取缓存可存储的最大项大小
             if (maxPageSize > maxCacheableSize) {
                 maxPageSize = maxCacheableSize;
             }
@@ -907,13 +907,13 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     public MVMap<String, String> start() {
-        if (size() == 0) {
-            initializeCommonHeaderAttributes(mvStore.getTimeAbsolute());
-            initializeStoreHeader(mvStore.getTimeAbsolute());
+        if (size() == 0) { // 存储为空
+            initializeCommonHeaderAttributes(mvStore.getTimeAbsolute()); // 初始化公共头部属性
+            initializeStoreHeader(mvStore.getTimeAbsolute()); // 初始化存储头部
         } else {
             saveChunkLock.lock();
             try {
-                readStoreHeader(recoveryMode);
+                readStoreHeader(recoveryMode); // 从文件存储中读取 & 恢复 header
             } finally {
                 saveChunkLock.unlock();
             }
@@ -921,7 +921,7 @@ public abstract class FileStore<C extends Chunk<C>>
         lastCommitTime = getTimeSinceCreation();
         mvStore.resetLastMapId(lastMapId());
         mvStore.setCurrentVersion(lastChunkVersion());
-        MVMap<String, String> metaMap = mvStore.openMetaMap();
+        MVMap<String, String> metaMap = mvStore.openMetaMap(); // 打开元数据映射
         scrubLayoutMap(metaMap);
         return metaMap;
     }
@@ -1055,15 +1055,15 @@ public abstract class FileStore<C extends Chunk<C>>
     }
 
     private C readChunkHeader(long block) {
-        long p = block * FileStore.BLOCK_SIZE;
-        ByteBuffer buff = readFully((C)null, p, Chunk.MAX_HEADER_LENGTH);
+        long p = block * FileStore.BLOCK_SIZE; // 计算块的起始位置
+        ByteBuffer buff = readFully((C)null, p, Chunk.MAX_HEADER_LENGTH); // 读取完整 chunk header 数据到缓冲区
         Throwable exception = null;
         try {
-            C chunk = createChunk(Chunk.readChunkHeader(buff));
+            C chunk = createChunk(Chunk.readChunkHeader(buff)); // 解析 chunk header, 创建 chunk 对象
             if (chunk.block == 0) {
                 chunk.block = block;
             }
-            if (chunk.block == block) {
+            if (chunk.block == block) { // 验证chunk是否正确创建,即 block 和给定的是否相同
                 return chunk;
             }
         } catch (MVStoreException e) {
@@ -1135,10 +1135,10 @@ public abstract class FileStore<C extends Chunk<C>>
      *         consistent
      */
     protected final C readChunkHeaderAndFooter(long block, int expectedId) {
-        C header = readChunkHeaderOptionally(block, expectedId);
+        C header = readChunkHeaderOptionally(block, expectedId); // 读取 chunk header
         if (header != null) {
-            C footer = readChunkFooter(block + header.len);
-            if (footer == null || footer.id != expectedId || footer.block != header.block) {
+            C footer = readChunkFooter(block + header.len); // 读取 chunk footer，根据 block 偏移量 + 当前 chunk 的 block 数量 定位
+            if (footer == null || footer.id != expectedId || footer.block != header.block) { // 校验
                 return null;
             }
         }
@@ -1152,8 +1152,8 @@ public abstract class FileStore<C extends Chunk<C>>
 
     protected final C readChunkHeaderOptionally(long block) {
         try {
-            C chunk = readChunkHeader(block);
-            return chunk.block != block ? null : chunk;
+            C chunk = readChunkHeader(block); // 根据 block 读取 chunk header
+            return chunk.block != block ? null : chunk; // 检查读取的块是否与请求的块匹配
         } catch (Exception ignore) {
             return null;
         }
@@ -1169,18 +1169,18 @@ public abstract class FileStore<C extends Chunk<C>>
         // the following can fail for various reasons
         try {
             // read the chunk footer of the last block of the file
-            long pos = block * FileStore.BLOCK_SIZE - Chunk.FOOTER_LENGTH;
+            long pos = block * FileStore.BLOCK_SIZE - Chunk.FOOTER_LENGTH; // 定位到 chunk footer 起始下标
             if(pos < 0) {
                 return null;
             }
-            ByteBuffer lastBlock = readFully((C)null, pos, Chunk.FOOTER_LENGTH);
+            ByteBuffer lastBlock = readFully((C)null, pos, Chunk.FOOTER_LENGTH); // 读取 chunk footer
             byte[] buff = new byte[Chunk.FOOTER_LENGTH];
             lastBlock.get(buff);
-            HashMap<String, String> m = DataUtils.parseChecksummedMap(buff);
+            HashMap<String, String> m = DataUtils.parseChecksummedMap(buff); // 解析属性
             if (m != null) {
-                C chunk = createChunk(m);
+                C chunk = createChunk(m); // 根据属性 创建 chunk 对象
                 if (chunk.block == 0) {
-                    chunk.block = block - chunk.len;
+                    chunk.block = block - chunk.len; // 计算当前 chunk 的起始 block number
                 }
                 return chunk;
             }
@@ -1942,7 +1942,7 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     /**
-     * Read a page.
+     * Read a page.读取page
      *
      * @param map the map
      * @param pos the page position
@@ -1954,16 +1954,16 @@ public abstract class FileStore<C extends Chunk<C>>
                 throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_FILE_CORRUPT, "Position 0");
             }
-            Page<K,V> page = readPageFromCache(pos);
-            if (page == null) {
-                C chunk = getChunk(pos);
-                int pageOffset = DataUtils.getPageOffset(pos);
+            Page<K,V> page = readPageFromCache(pos); // 先从cache读取page
+            if (page == null) { // cache 为空
+                C chunk = getChunk(pos); // 根据 position 读取 chunk
+                int pageOffset = DataUtils.getPageOffset(pos); // 根据 position 提取 page offset
                 while(true) {
                     MVStoreException exception = null;
                     ByteBuffer buff = chunk.buffer;
                     boolean alreadySaved = buff == null;
                     if (alreadySaved) {
-                        buff = chunk.readBufferForPage(this, pageOffset, pos);
+                        buff = chunk.readBufferForPage(this, pageOffset, pos); // 读取 page 到 buffer
                     } else {
 //                        System.err.println("Using unsaved buffer " + chunk.id + "/" + pageOffset);
                         buff = buff.duplicate();
@@ -1971,7 +1971,7 @@ public abstract class FileStore<C extends Chunk<C>>
                         buff = buff.slice();
                     }
                     try {
-                        page = Page.read(buff, pos, map);
+                        page = Page.read(buff, pos, map); // 解析 buffer 为 page 对象
                     } catch (MVStoreException e) {
                         exception = e;
                     } catch (Exception e) {
@@ -1986,7 +1986,7 @@ public abstract class FileStore<C extends Chunk<C>>
                         throw exception;
                     }
                 }
-                cachePage(page);
+                cachePage(page); // 将读取的 page 缓存起来
             }
             return page;
         } catch (MVStoreException e) {
@@ -1997,29 +1997,29 @@ public abstract class FileStore<C extends Chunk<C>>
         }
     }
 
-    /**
+    /** 根据给定 position 读取 chunk
      * Get the chunk for the given position.
      *
      * @param pos the position
      * @return the chunk
      */
     private C getChunk(long pos) {
-        int chunkId = DataUtils.getPageChunkId(pos);
-        C c = chunks.get(chunkId);
-        if (c == null) {
-            String s = layout.get(Chunk.getMetaKey(chunkId));
+        int chunkId = DataUtils.getPageChunkId(pos); // 根据位置计算chunk的ID
+        C c = chunks.get(chunkId); // 从 chunks 缓存 map 中获取对应的 chunk
+        if (c == null) { // 如果chunk不存在，则尝试从存储中加载
+            String s = layout.get(Chunk.getMetaKey(chunkId)); // 获取chunk的元数据字符串
             if (s == null) {
                 throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_CHUNK_NOT_FOUND,
                         "Chunk {0} not found", chunkId);
             }
-            c = createChunk(s);
+            c = createChunk(s); // 根据元数据字符串创建chunk对象
             if (!c.isSaved()) {
                 throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_FILE_CORRUPT,
                         "Chunk {0} is invalid", chunkId);
             }
-            chunks.put(c.id, c);
+            chunks.put(c.id, c); // 将chunk添加到缓存中
         }
         return c;
     }

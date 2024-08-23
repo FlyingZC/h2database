@@ -62,11 +62,11 @@ public class SingleFileStore extends RandomAccessStore {
 
     @Override
     protected void writeFully(SFChunk chunk, long pos, ByteBuffer src) {
-        int len = src.remaining();
-        setSize(Math.max(super.size(), pos + len));
-        DataUtils.writeFully(fileChannel, pos, src);
-        writeCount.incrementAndGet();
-        writeBytes.addAndGet(len);
+        int len = src.remaining(); // 计算待写入数据的长度
+        setSize(Math.max(super.size(), pos + len)); // 设置文件大小，确保可以容纳写入的数据
+        DataUtils.writeFully(fileChannel, pos, src); // 写出到文件
+        writeCount.incrementAndGet(); // 增加写入操作的计数
+        writeBytes.addAndGet(len);  // 增加写入的字节总数
     }
 
     /**
@@ -109,12 +109,12 @@ public class SingleFileStore extends RandomAccessStore {
         }
         init(fileName, readOnly);
         try {
-            fileChannel = f.open(readOnly ? "r" : "rw");
+            fileChannel = f.open(readOnly ? "r" : "rw"); // 打开 fileChannel
             if (encryptionTransformer != null) {
                 originalFileChannel = fileChannel;
                 fileChannel = encryptionTransformer.apply(fileChannel);
             }
-            fileLock = lockFileChannel(fileChannel, readOnly, fileName);
+            fileLock = lockFileChannel(fileChannel, readOnly, fileName); // fileChannel 加文件锁
             saveChunkLock.lock();
             try {
                 setSize(fileChannel.size());

@@ -33,6 +33,7 @@ import org.h2.store.fs.FilePath;
 import org.h2.store.fs.FileUtils;
 import org.h2.test.TestBase;
 import org.h2.util.Utils;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests the MVStore.
@@ -2099,5 +2100,26 @@ public class TestMVStore extends TestBase {
     protected static void log(String msg) {
         // System.out.println(msg);
     }
+    
+    @Test
+    public void test01_readWriteMap() throws Exception {
+        // 创建 mvStore & 读写 map
+        // open the store (in-memory if fileName is null)
+        MVStore s = MVStore.open(null);
 
+        // create/get the map named "data"
+        MVMap<Integer, String> map = s.openMap("data");
+
+        // add and read some data
+        map.put(1, "Hello World");
+        System.out.println(map.get(1));
+
+        // close the store (this will persist changes)
+        s.close();
+    }
+    
+    @Test
+    public void test02_example() throws Exception {
+        testExample();
+    }
 }

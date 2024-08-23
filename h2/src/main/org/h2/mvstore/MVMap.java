@@ -639,22 +639,22 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      *
      */
     final void setRootPos(long rootPos, long version) {
-        Page<K,V> root = readOrCreateRootPage(rootPos);
-        if (root.map != this) {
+        Page<K,V> root = readOrCreateRootPage(rootPos); // 读取或创建 root page
+        if (root.map != this) { // 这种情况可能发生在并发打开现有 map 时
             // this can only happen on concurrent opening of existing map,
             // when second thread picks up some cached page already owned by
             // the first map's instantiation (both maps share the same id)
             assert id == root.map.id;
             // since it is unknown which one will win the race,
             // let each map instance to have it's own copy
-            root = root.copy(this, false);
+            root = root.copy(this, false); // 由于无法确定哪个线程会获胜，因此 copy root 让每个 map 实例拥有自己的副本
         }
-        setInitialRoot(root, version - 1);
+        setInitialRoot(root, version - 1); // 设置初始根页面和版本号
         setWriteVersion(version);
     }
 
     private Page<K,V> readOrCreateRootPage(long rootPos) {
-        Page<K,V> root = rootPos == 0 ? createEmptyLeaf() : readPage(rootPos);
+        Page<K,V> root = rootPos == 0 ? createEmptyLeaf() : readPage(rootPos); // 根据根页位置rootPos, 决定是创建一个新的空叶页 or 读取已存在的页 作为根页
         return root;
     }
 
