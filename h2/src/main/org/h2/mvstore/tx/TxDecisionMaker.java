@@ -145,7 +145,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
         return value;
     }
 
-    /**
+    /** 创建 undo log
      * Create undo log entry and record for future references
      * {@link org.h2.mvstore.MVMap.Decision#PUT} decision along with last known
      * committed value
@@ -155,9 +155,9 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
      * @return {@link org.h2.mvstore.MVMap.Decision#PUT}
      */
     MVMap.Decision logAndDecideToPut(VersionedValue<V> valueToLog, V lastValue) {
-        undoKey = transaction.log(new Record<>(mapId, key, valueToLog));
+        undoKey = transaction.log(new Record<>(mapId, key, valueToLog)); // 记录 undo log
         this.lastValue = lastValue;
-        return setDecision(MVMap.Decision.PUT);
+        return setDecision(MVMap.Decision.PUT); // put 操作
     }
 
     final MVMap.Decision decideToAbort(V lastValue) {
@@ -270,7 +270,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
                     // it was removed and committed by another transaction
                     return decideToAbort(snapshotValue);
                 }
-                return logAndDecideToPut(null, null);
+                return logAndDecideToPut(null, null); // 记录 undo log & put 操作
             } else {
                 long id = existingValue.getOperationId();
                 if (id == 0 // entry is a committed one

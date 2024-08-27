@@ -313,7 +313,7 @@ public final class Transaction {
         return isolationLevel == IsolationLevel.READ_COMMITTED;
     }
 
-    /**
+    /** 判断当前事务是否有 RC 或更低的隔离级别(允许不可重复读)
      * Whether this transaction has isolation level READ_COMMITTED or below.
      * @return true if isolation level is READ_COMMITTED or READ_UNCOMMITTED
      */
@@ -389,7 +389,7 @@ public final class Transaction {
         }
     }
 
-    /**
+    /** 添加 undo log entry
      * Add a log entry.
      *
      * @param logRecord to append
@@ -397,17 +397,17 @@ public final class Transaction {
      * @return key for the newly added undo log entry
      */
     long log(Record<?,?> logRecord) {
-        long currentState = statusAndLogId.getAndIncrement();
-        long logId = getLogId(currentState);
+        long currentState = statusAndLogId.getAndIncrement(); // status&logId 递增
+        long logId = getLogId(currentState); // 获取 logId
         if (logId >= LOG_ID_LIMIT) {
             throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TRANSACTION_TOO_BIG,
                     "Transaction {0} has too many changes",
                     transactionId);
         }
-        int currentStatus = getStatus(currentState);
-        checkOpen(currentStatus);
-        long undoKey = store.addUndoLogRecord(transactionId, logId, logRecord);
+        int currentStatus = getStatus(currentState); // 获取 state
+        checkOpen(currentStatus); // 校验状态应该是 open
+        long undoKey = store.addUndoLogRecord(transactionId, logId, logRecord); // undo log 添加到存储
         return undoKey;
     }
 

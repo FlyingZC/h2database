@@ -162,36 +162,36 @@ public class MVTable extends TableBase {
 
     @Override
     public boolean lock(SessionLocal session, int lockType) {
-        if (database.getLockMode() == Constants.LOCK_MODE_OFF) {
+        if (database.getLockMode() == Constants.LOCK_MODE_OFF) { // 如果数据库的锁定模式已关闭，则无需加锁
             session.registerTableAsUpdated(this);
             return false;
         }
-        if (lockType == Table.READ_LOCK && lockExclusiveSession == null) {
+        if (lockType == Table.READ_LOCK && lockExclusiveSession == null) { // 如果请求读锁 & 已有独占锁会话，则不允许新的读锁
             return false;
         }
-        if (lockExclusiveSession == session) {
+        if (lockExclusiveSession == session) { // 如果当前会话已拥有独占锁，则无需再次加锁
             return true;
         }
-        if (lockType != Table.EXCLUSIVE_LOCK && lockSharedSessions.containsKey(session)) {
+        if (lockType != Table.EXCLUSIVE_LOCK && lockSharedSessions.containsKey(session)) { // 如果当前会话已存在于共享锁会话中，则允许同一会话的再次锁定请求
             return true;
         }
         synchronized (this) {
             if (lockType != Table.EXCLUSIVE_LOCK && lockSharedSessions.containsKey(session)) {
                 return true;
             }
-            session.setWaitForLock(this, Thread.currentThread());
-            if (SysProperties.THREAD_DEADLOCK_DETECTOR) {
+            session.setWaitForLock(this, Thread.currentThread()); // 设置当前会话正在等待的锁信息
+            if (SysProperties.THREAD_DEADLOCK_DETECTOR) { // 如果启用了死锁检测，则设置线程本地变量以辅助检测
                 WAITING_FOR_LOCK.set(getName());
             }
-            waitingSessions.addLast(session);
+            waitingSessions.addLast(session); // 将当前会话添加到等待队列
             try {
-                doLock1(session, lockType);
+                doLock1(session, lockType); // 实际执行加锁操作
             } finally {
-                session.setWaitForLock(null, null);
-                if (SysProperties.THREAD_DEADLOCK_DETECTOR) {
+                session.setWaitForLock(null, null); // 清除等待锁的信息
+                if (SysProperties.THREAD_DEADLOCK_DETECTOR) { // 如果启用了死锁检测，则清除线程本地变量中的相关信息
                     WAITING_FOR_LOCK.remove();
                 }
-                waitingSessions.remove(session);
+                waitingSessions.remove(session); // 从等待队列中移除当前会话
             }
         }
         return false;
@@ -204,12 +204,12 @@ public class MVTable extends TableBase {
         boolean checkDeadlock = false;
         while (true) {
             // if I'm the next one in the queue
-            if (waitingSessions.getFirst() == session && lockExclusiveSession == null) {
-                if (doLock2(session, lockType)) {
+            if (waitingSessions.getFirst() == session && lockExclusiveSession == null) { // 如果当前会话在等待队列的首位 & 没有独占锁持有者
+                if (doLock2(session, lockType)) { // 尝试获取锁
                     return;
                 }
             }
-            if (checkDeadlock) {
+            if (checkDeadlock) { // 检查死锁
                 ArrayList<SessionLocal> sessions = checkDeadlock(session, null, null);
                 if (sessions != null) {
                     throw DbException.get(ErrorCode.DEADLOCK_1,
@@ -222,7 +222,7 @@ public class MVTable extends TableBase {
             long now = System.nanoTime();
             if (max == 0L) {
                 // try at least one more time
-                max = Utils.nanoTimePlusMillis(now, session.getLockTimeout());
+                max = Utils.nanoTimePlusMillis(now, session.getLockTimeout()); // 当前时间+锁超时时间
             } else if (now - max >= 0L) {
                 traceLock(session, lockType,
                         TraceLockEvent.TRACE_LOCK_TIMEOUT_AFTER, Integer.toString(session.getLockTimeout()));
@@ -242,25 +242,25 @@ public class MVTable extends TableBase {
         }
     }
 
-    private boolean doLock2(SessionLocal session, int lockType) {
+    private boolean doLock2(SessionLocal session, int lockType) { // 执行升级锁或写锁操作
         switch (lockType) {
-        case Table.EXCLUSIVE_LOCK:
+        case Table.EXCLUSIVE_LOCK: // 独占锁
             int size = lockSharedSessions.size();
-            if (size == 0) {
+            if (size == 0) { // 当前没有共享锁
                 traceLock(session, lockType, TraceLockEvent.TRACE_LOCK_ADDED_FOR, NO_EXTRA_INFO);
                 session.registerTableAsLocked(this);
-            } else if (size == 1 && lockSharedSessions.containsKey(session)) {
+            } else if (size == 1 && lockSharedSessions.containsKey(session)) { // 就一个共享锁&就是当前session持有的
                 traceLock(session, lockType, TraceLockEvent.TRACE_LOCK_ADD_UPGRADED_FOR, NO_EXTRA_INFO);
             } else {
                 return false;
             }
-            lockExclusiveSession = session;
+            lockExclusiveSession = session; // 加独占锁
             if (SysProperties.THREAD_DEADLOCK_DETECTOR) {
                 addLockToDebugList(EXCLUSIVE_LOCKS);
             }
             break;
         case Table.WRITE_LOCK:
-            if (lockSharedSessions.putIfAbsent(session, session) == null) {
+            if (lockSharedSessions.putIfAbsent(session, session) == null) { // 写锁 是 共享锁
                 traceLock(session, lockType, TraceLockEvent.TRACE_LOCK_OK, NO_EXTRA_INFO);
                 session.registerTableAsLocked(this);
                 if (SysProperties.THREAD_DEADLOCK_DETECTOR) {
@@ -514,8 +514,8 @@ public class MVTable extends TableBase {
         Transaction t = session.getTransaction();
         long savepoint = t.setSavepoint();
         try {
-            for (Index index : indexes) {
-                index.add(session, row);
+            for (Index index : indexes) { // 遍历索引
+                index.add(session, row); // 记录添加到索引,注意 mysql/h2 数据就是按照 primary key 索引维护的,所以插入数据的逻辑就在这里
             }
         } catch (Throwable e) {
             try {

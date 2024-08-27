@@ -52,15 +52,15 @@ public final class CursorPos<K,V> {
      */
     static <K,V> CursorPos<K,V> traverseDown(Page<K,V> page, K key) {
         CursorPos<K,V> cursorPos = null;
-        while (!page.isLeaf()) {
-            int index = page.binarySearch(key) + 1;
+        while (!page.isLeaf()) { // 当前页面不是叶子节点时，继续向下遍历
+            int index = page.binarySearch(key) + 1; // 二分搜索
             if (index < 0) {
                 index = -index;
             }
             cursorPos = new CursorPos<>(page, index, cursorPos);
-            page = page.getChildPage(index);
+            page = page.getChildPage(index); // 继续向下遍历到指定索引的子页面
         }
-        return new CursorPos<>(page, page.binarySearch(key), cursorPos);
+        return new CursorPos<>(page, page.binarySearch(key), cursorPos); // 在叶子节点中搜索 key 的位置
     }
 
     /**

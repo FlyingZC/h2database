@@ -86,7 +86,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
 
     @Override
     public void add(SessionLocal session, Row row) {
-        if (mainIndexColumn == SearchRow.ROWID_INDEX) {
+        if (mainIndexColumn == SearchRow.ROWID_INDEX) { // 为没有显式主键的行生成主键值
             if (row.getKey() == 0) {
                 row.setKey(lastKey.incrementAndGet());
             }

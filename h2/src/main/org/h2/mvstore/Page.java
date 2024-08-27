@@ -62,7 +62,7 @@ public abstract class Page<K,V> implements Cloneable {
      */
     public int pageNo = -1;
 
-    /**
+    /** 最新一次查询操作的结果缓存
      * The last result of a find operation is cached.
      */
     private int cachedCompare;
@@ -396,7 +396,7 @@ public abstract class Page<K,V> implements Cloneable {
         return clone;
     }
 
-    /**
+    /** 在page中二分查找key.若找到key,返回;若未找到key,返回-1
      * Search the key in this page using a binary search. Instead of always
      * starting the search in the middle, the last found index is cached.
      * <p>
@@ -409,7 +409,7 @@ public abstract class Page<K,V> implements Cloneable {
      */
     int binarySearch(K key) {
         int res = map.getKeyType().binarySearch(key, keys, getKeyCount(), cachedCompare);
-        cachedCompare = res < 0 ? ~res : res + 1;
+        cachedCompare = res < 0 ? ~res : res + 1; // 更新缓存的比较结果，用于下次优化查找
         return res;
     }
 
@@ -540,16 +540,16 @@ public abstract class Page<K,V> implements Cloneable {
      * @param key the key value
      */
     final void insertKey(int index, K key) {
-        int keyCount = getKeyCount();
+        int keyCount = getKeyCount(); // 获取 key 数量
         assert index <= keyCount : index + " > " + keyCount;
-        K[] newKeys = createKeyStorage(keyCount + 1);
-        DataUtils.copyWithGap(keys, newKeys, keyCount, index);
-        keys = newKeys;
+        K[] newKeys = createKeyStorage(keyCount + 1); // 创建新的key存储数组
+        DataUtils.copyWithGap(keys, newKeys, keyCount, index); // 复制原有key到新数组
+        keys = newKeys; // 更新 keys 引用，指向新的 keys
 
-        keys[index] = key;
+        keys[index] = key; // 在指定 keys 位置插入 key
 
-        if (isPersistent()) {
-            addMemory(MEMORY_POINTER + map.evaluateMemoryForKey(key));
+        if (isPersistent()) { // is 持久化 
+            addMemory(MEMORY_POINTER + map.evaluateMemoryForKey(key)); // 计算插入key的内存开销
         }
     }
 
@@ -1576,15 +1576,15 @@ public abstract class Page<K,V> implements Cloneable {
         }
 
         @Override
-        public void insertLeaf(int index, K key, V value) {
+        public void insertLeaf(int index, K key, V value) { // 在指定位置插入叶子节点,叶子节点存储内容包括 key & value
             int keyCount = getKeyCount();
-            insertKey(index, key);
+            insertKey(index, key); // 插入 key
 
-            if(values != null) {
-                V[] newValues = createValueStorage(keyCount + 1);
+            if(values != null) { // 下面 插入 value
+                V[] newValues = createValueStorage(keyCount + 1); // 创建新数组,原始大小+1,存储value
                 DataUtils.copyWithGap(values, newValues, keyCount, index);
                 values = newValues;
-                setValueInternal(index, value);
+                setValueInternal(index, value); // 设置 value
                 if (isPersistent()) {
                     addMemory(MEMORY_POINTER + map.evaluateMemoryForValue(value));
                 }

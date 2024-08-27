@@ -837,7 +837,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      * @return current root reference
      */
     public RootReference<K,V> flushAndGetRoot() {
-        RootReference<K,V> rootReference = getRoot();
+        RootReference<K,V> rootReference = getRoot(); // 获取根节点引用
         if (singleWriter && rootReference.getAppendCounter() > 0) {
             return flushAppendBuffer(rootReference, true);
         }
@@ -1377,21 +1377,21 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
     public void append(K key, V value) {
         if (singleWriter) {
             beforeWrite();
-            RootReference<K,V> rootReference = lockRoot(getRoot(), 1);
-            int appendCounter = rootReference.getAppendCounter();
+            RootReference<K,V> rootReference = lockRoot(getRoot(), 1); // 锁定根节点
+            int appendCounter = rootReference.getAppendCounter(); // 获取写入下标
             try {
-                if (appendCounter >= keysPerPage) {
+                if (appendCounter >= keysPerPage) { // 数量超出则 flush buffer
                     rootReference = flushAppendBuffer(rootReference, false);
                     appendCounter = rootReference.getAppendCounter();
                     assert appendCounter < keysPerPage;
                 }
-                keysBuffer[appendCounter] = key;
+                keysBuffer[appendCounter] = key; // key 写入 buffer
                 if (valuesBuffer != null) {
-                    valuesBuffer[appendCounter] = value;
+                    valuesBuffer[appendCounter] = value; // value 写入 buffer
                 }
-                ++appendCounter;
+                ++appendCounter; // 下标递增
             } finally {
-                unlockRoot(appendCounter);
+                unlockRoot(appendCounter); // 解锁 root
             }
         } else {
             put(key, value);
@@ -1763,7 +1763,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
             V result;
             unsavedMemoryHolder.value = 0;
             try {
-                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key);
+                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 从根节点开始，根据key遍历tree,找到key的位置
                 if (!locked && rootReference != getRoot()) {
                     continue;
                 }
@@ -1771,8 +1771,8 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                 int index = pos.index;
                 tip = pos;
                 pos = pos.parent;
-                result = index < 0 ? null : p.getValue(index);
-                Decision decision = decisionMaker.decide(result, value, tip);
+                result = index < 0 ? null : p.getValue(index); // 根据索引获取值,如果是插入操作此处为null,因为原来没有值
+                Decision decision = decisionMaker.decide(result, value, tip); // 根据 当前值、目标值 和 游标位置 决定操作类型
 
                 switch (decision) {
                     case REPEAT:
@@ -1793,7 +1793,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                             return null;
                         }
 
-                        if (p.getTotalCount() == 1 && pos != null) {
+                        if (p.getTotalCount() == 1 && pos != null) { // 如果当前页只有一个键且有父节点，则尝试移除父节点的键
                             int keyCount;
                             do {
                                 p = pos.page;
@@ -1807,7 +1807,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                             } while (keyCount == 0 && pos != null);
 
                             if (keyCount <= 1) {
-                                if (keyCount == 1) {
+                                if (keyCount == 1) { // 如果父节点只有一个键，替换父节点为叶子节点
                                     assert index <= 1;
                                     p = p.getChildPage(1 - index);
                                 } else {
@@ -1819,15 +1819,15 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                                 break;
                             }
                         }
-                        p = p.copy();
+                        p = p.copy(); // 复制页面并移除键
                         p.remove(index);
                         break;
                     }
-                    case PUT: {
+                    case PUT: { // put 操作
                         value = decisionMaker.selectValue(result, value);
-                        p = p.copy();
-                        if (index < 0) {
-                            p.insertLeaf(-index - 1, key, value);
+                        p = p.copy(); // copy page
+                        if (index < 0) { // 插入操作
+                            p.insertLeaf(-index - 1, key, value); // 插入叶子节点
                             int keyCount;
                             while ((keyCount = p.getKeyCount()) > store.getKeysPerPage()
                                     || p.getMemory() > store.getMaxPageSize()
@@ -1860,12 +1860,12 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                         break;
                     }
                 }
-                rootPage = replacePage(pos, p, unsavedMemoryHolder);
-                if (!locked) {
-                    rootReference = rootReference.updateRootPage(rootPage, attempt);
-                    if (rootReference == null) {
-                        decisionMaker.reset();
-                        continue;
+                rootPage = replacePage(pos, p, unsavedMemoryHolder); // 替换page
+                if (!locked) { // 未上锁
+                    rootReference = rootReference.updateRootPage(rootPage, attempt); // 更新 root page 引用
+                    if (rootReference == null) { // 没有更新成功
+                        decisionMaker.reset(); // 重试
+                        continue; // continue 重试插入
                     }
                 }
                 if (isPersistent()) {

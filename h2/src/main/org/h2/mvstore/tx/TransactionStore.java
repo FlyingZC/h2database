@@ -300,7 +300,7 @@ public class TransactionStore {
     private static final int LOG_ID_BITS = Transaction.LOG_ID_BITS;
     private static final long LOG_ID_MASK = (1L << LOG_ID_BITS) - 1;
 
-    /**
+    /** 事务id 和 log id 计算 operation id
      * Combine the transaction id and the log id to an operation id.
      *
      * @param transactionId the transaction id
@@ -398,12 +398,12 @@ public class TransactionStore {
         do {
             VersionedBitSet original = openTransactions.get();
             if (txId == 0) {
-                transactionId = original.nextClearBit(1);
+                transactionId = original.nextClearBit(1); // 获取事务 id
             } else {
                 transactionId = txId;
                 assert !original.get(transactionId);
             }
-            if (transactionId > maxTransactionId) {
+            if (transactionId > maxTransactionId) { // 最大事务id校验 65535
                 throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_TOO_MANY_OPEN_TRANSACTIONS,
                         "There are {0} open transactions",
@@ -413,8 +413,8 @@ public class TransactionStore {
             clone.set(transactionId);
             sequenceNo = clone.getVersion() + 1;
             clone.setVersion(sequenceNo);
-            success = openTransactions.compareAndSet(original, clone);
-        } while(!success);
+            success = openTransactions.compareAndSet(original, clone); // cas 原子更新 openTransactions 对象 
+        } while(!success); // 更新不成功重试
 
         Transaction transaction = new Transaction(this, transactionId, sequenceNo, status, name, logId,
                 timeoutMillis, ownerId, isolationLevel, listener);
@@ -422,9 +422,9 @@ public class TransactionStore {
         assert transactions.get(transactionId) == null;
         transactions.set(transactionId, transaction);
 
-        if (undoLogs[transactionId] == null) {
+        if (undoLogs[transactionId] == null) { // 若 undo log 指定位置没有初始化
             String undoName = getUndoLogName(transactionId);
-            MVMap<Long,Record<?,?>> undoLog = store.openMap(undoName, undoLogBuilder);
+            MVMap<Long,Record<?,?>> undoLog = store.openMap(undoName, undoLogBuilder); // 创建存储 undo log 的 mvMap
             undoLogs[transactionId] = undoLog;
         }
         return transaction;
@@ -453,7 +453,7 @@ public class TransactionStore {
      * @return key for the added record
      */
     long addUndoLogRecord(int transactionId, long logId, Record<?,?> record) {
-        MVMap<Long, Record<?,?>> undoLog = undoLogs[transactionId];
+        MVMap<Long, Record<?,?>> undoLog = undoLogs[transactionId]; // 获取指定事务对应的 undo log 映射
         long undoKey = getOperationId(transactionId, logId);
         if (logId == 0 && !undoLog.isEmpty()) {
             throw DataUtils.newMVStoreException(
@@ -462,7 +462,7 @@ public class TransactionStore {
                     "is still open: {0}",
                     transactionId);
         }
-        undoLog.append(undoKey, record);
+        undoLog.append(undoKey, record); // 追加 undo log
         return undoKey;
     }
 

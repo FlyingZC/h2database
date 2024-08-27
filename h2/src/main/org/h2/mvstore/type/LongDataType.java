@@ -54,30 +54,30 @@ public class LongDataType extends BasicDataType<Long> {
     public int binarySearch(Long keyObj, Object storageObj, int size, int initialGuess) {
         long key = keyObj;
         Long[] storage = cast(storageObj);
-        int low = 0;
-        int high = size - 1;
+        int low = 0; // 下界
+        int high = size - 1; // 上界
         // the cached index minus one, so that
         // for the first time (when cachedCompare is 0),
         // the default value is used
-        int x = initialGuess - 1;
-        if (x < 0 || x > high) {
-            x = high >>> 1;
+        int x = initialGuess - 1; // 猜测下标
+        if (x < 0 || x > high) { // x小于0 或 大于high
+            x = high >>> 1; // x 设置为 high 的一半 (无符号右移)
         }
-        return binarySearch(key, storage, low, high, x);
+        return binarySearch(key, storage, low, high, x); // 进行二分查找
     }
 
-    private static int binarySearch(long key, Long[] storage, int low, int high, int x) {
-        while (low <= high) {
+    private static int binarySearch(long key, Long[] storage, int low, int high, int x) { // 在已排序的Long数组storage中, 查找第一个值等于key的元素的位置
+        while (low <= high) { // 使用循环不断将查找区间减半，直到low大于high
             long midVal = storage[x];
             if (key > midVal) {
                 low = x + 1;
             } else if (key < midVal) {
                 high = x - 1;
             } else {
-                return x;
+                return x; // 找到则返回目标索引
             }
-            x = (low + high) >>> 1;
+            x = (low + high) >>> 1; // 更新x为新的中间下标
         }
-        return -(low + 1);
+        return -(low + 1); // 找不到返回负数，表示插入位置(low 最终会比 high 大)
     }
 }

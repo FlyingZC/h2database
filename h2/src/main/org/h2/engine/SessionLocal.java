@@ -859,7 +859,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      * @return the savepoint
      */
     public Savepoint setSavepoint() {
-        Savepoint sp = new Savepoint();
+        Savepoint sp = new Savepoint(); // 创建 savepoint
         sp.transactionSavepoint = getStatementSavepoint();
         return sp;
     }

@@ -140,38 +140,38 @@ public final class Insert extends CommandWithValues implements ResultTarget {
     }
 
     private long insertRows() {
-        session.getUser().checkTableRight(table, Right.INSERT);
+        session.getUser().checkTableRight(table, Right.INSERT); // 校验用户 insert 权限
         setCurrentRowNumber(0);
         table.fire(session, Trigger.INSERT, true);
         rowNumber = 0;
-        int listSize = valuesExpressionList.size();
+        int listSize = valuesExpressionList.size(); // 获取 insert values
         if (listSize > 0) {
             int columnLen = columns.length;
-            for (int x = 0; x < listSize; x++) {
-                Row newRow = table.getTemplateRow();
-                Expression[] expr = valuesExpressionList.get(x);
+            for (int x = 0; x < listSize; x++) { // 遍历 insert values 大小
+                Row newRow = table.getTemplateRow(); // 创建 模板行 用于后续填充数据
+                Expression[] expr = valuesExpressionList.get(x); // 当前 value 表达式
                 setCurrentRowNumber(x + 1);
-                for (int i = 0; i < columnLen; i++) {
+                for (int i = 0; i < columnLen; i++) { // 遍历插入的列
                     Column c = columns[i];
                     int index = c.getColumnId();
                     Expression e = expr[i];
                     if (e != ValueExpression.DEFAULT) {
                         try {
-                            newRow.setValue(index, e.getValue(session));
+                            newRow.setValue(index, e.getValue(session)); // 从表达式里获取值，设置列的值到行里
                         } catch (DbException ex) {
                             throw setRow(ex, x, getSimpleSQL(expr));
                         }
                     }
                 }
                 rowNumber++;
-                table.convertInsertRow(session, newRow, overridingSystem);
+                table.convertInsertRow(session, newRow, overridingSystem); // 将新行转换为插入行格式
                 if (deltaChangeCollectionMode == ResultOption.NEW) {
                     deltaChangeCollector.addRow(newRow.getValueList().clone());
                 }
                 if (!table.fireBeforeRow(session, null, newRow)) {
-                    table.lock(session, Table.WRITE_LOCK);
+                    table.lock(session, Table.WRITE_LOCK); // table加写锁
                     try {
-                        table.addRow(session, newRow);
+                        table.addRow(session, newRow); // 行插入 mvTable
                     } catch (DbException de) {
                         if (handleOnDuplicate(de, null)) {
                             // MySQL returns 2 for updated row

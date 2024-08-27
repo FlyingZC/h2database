@@ -403,7 +403,7 @@ public final class Column implements HasSQL, Typed, ColumnTemplate {
             }
         }
         try {
-            value = value.convertForAssignTo(type, session, name);
+            value = value.convertForAssignTo(type, session, name); // 将 value 转换成指定类型，比如 ValueInteger 类型
         } catch (DbException e) {
             if (e.getErrorCode() == ErrorCode.DATA_CONVERSION_ERROR_1) {
                 e = getDataConversionError(value, e);
