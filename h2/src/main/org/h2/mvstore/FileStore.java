@@ -148,14 +148,14 @@ public abstract class FileStore<C extends Chunk<C>>
     private ThreadPoolExecutor bufferSaveExecutor;
 
 
-    /**
+    /** page 缓存
      * The page cache. The default size is 16 MB, and the average size is 2 KB.
      * It is split in 16 segments. The stack move distance is 2% of the expected
      * number of entries.
      */
     private final CacheLongKeyLIRS<Page<?,?>> cache;
 
-    /**
+    /** 缓存 chunk 的 sequential number
      * Cache for chunks "Table of Content" used to translate page's
      * sequential number within containing chunk into byte position
      * within chunk's image. Cache keyed by chunk id.
@@ -232,9 +232,9 @@ public abstract class FileStore<C extends Chunk<C>>
                 cc.segmentCount = (Integer)o;
             }
         }
-        cache = cc == null ? null : new CacheLongKeyLIRS<>(cc); // 根据缓存配置,初始化缓存实例
+        cache = cc == null ? null : new CacheLongKeyLIRS<>(cc); // 1.根据缓存配置,初始化 page 缓存实例
 
-        CacheLongKeyLIRS.Config cc2 = new CacheLongKeyLIRS.Config(); // 初始化 chunks 缓存配置 cc2
+        CacheLongKeyLIRS.Config cc2 = new CacheLongKeyLIRS.Config(); // 2.初始化 chunks 缓存配置 cc2
         cc2.maxMemory = 1024L * 1024L;
         chunksToC = new CacheLongKeyLIRS<>(cc2); // chunks 缓存
 
@@ -262,8 +262,8 @@ public abstract class FileStore<C extends Chunk<C>>
     public final void bind(MVStore mvStore) {
         if(this.mvStore != mvStore) {
             long pos = layout == null ? 0L : layout.getRootPage().getPos();
-            layout = new MVMap<>(mvStore, 0, StringDataType.INSTANCE, StringDataType.INSTANCE);
-            layout.setRootPos(pos, mvStore.getCurrentVersion());
+            layout = new MVMap<>(mvStore, 0, StringDataType.INSTANCE, StringDataType.INSTANCE); // 1.创建空的 mvMap
+            layout.setRootPos(pos, mvStore.getCurrentVersion()); // root节点此时也是创建 empty 节点
             this.mvStore = mvStore;
             mvStore.resetLastMapId(lastChunk == null ? 0 : lastChunk.mapId);
             mvStore.setCurrentVersion(lastChunkVersion());
@@ -626,16 +626,16 @@ public abstract class FileStore<C extends Chunk<C>>
     }
 
     protected final void setLastChunk(C last) {
-        lastChunk = last;
+        lastChunk = last; // 1.设置最新的 chunk
         chunks.clear();
         lastChunkId = 0;
         long layoutRootPos = 0;
         if (last != null) { // there is a valid chunk
             lastChunkId = last.id;
             layoutRootPos = last.layoutRootPos;
-            chunks.put(last.id, last);
+            chunks.put(last.id, last); // 2.缓存最新的 chunk
         }
-        layout.setRootPos(layoutRootPos, lastChunkVersion());
+        layout.setRootPos(layoutRootPos, lastChunkVersion()); // 3.设置 mvMap 的 root pos 为当前最新的 chunk
     }
 
     protected final void registerDeadChunk(C chunk) {
@@ -1942,7 +1942,7 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     /**
-     * Read a page.读取page
+     * Read a page.读取page并缓存
      *
      * @param map the map
      * @param pos the page position
@@ -1954,16 +1954,16 @@ public abstract class FileStore<C extends Chunk<C>>
                 throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_FILE_CORRUPT, "Position 0");
             }
-            Page<K,V> page = readPageFromCache(pos); // 先从cache读取page
+            Page<K,V> page = readPageFromCache(pos); // 1.先从cache读取page
             if (page == null) { // cache 为空
-                C chunk = getChunk(pos); // 根据 position 读取 chunk
-                int pageOffset = DataUtils.getPageOffset(pos); // 根据 position 提取 page offset
+                C chunk = getChunk(pos); // 2.1.根据 position 读取 chunk
+                int pageOffset = DataUtils.getPageOffset(pos); // 2.2.根据 position 提取 page offset
                 while(true) {
                     MVStoreException exception = null;
                     ByteBuffer buff = chunk.buffer;
                     boolean alreadySaved = buff == null;
                     if (alreadySaved) {
-                        buff = chunk.readBufferForPage(this, pageOffset, pos); // 读取 page 到 buffer
+                        buff = chunk.readBufferForPage(this, pageOffset, pos); // 2.3.读取 page 到 buffer
                     } else {
 //                        System.err.println("Using unsaved buffer " + chunk.id + "/" + pageOffset);
                         buff = buff.duplicate();
@@ -1971,7 +1971,7 @@ public abstract class FileStore<C extends Chunk<C>>
                         buff = buff.slice();
                     }
                     try {
-                        page = Page.read(buff, pos, map); // 解析 buffer 为 page 对象
+                        page = Page.read(buff, pos, map); // 2.4.解析 buffer 为 page 对象
                     } catch (MVStoreException e) {
                         exception = e;
                     } catch (Exception e) {
@@ -1986,7 +1986,7 @@ public abstract class FileStore<C extends Chunk<C>>
                         throw exception;
                     }
                 }
-                cachePage(page); // 将读取的 page 缓存起来
+                cachePage(page); // 3.将读取的 page 缓存到 CacheLongKeyLIRS
             }
             return page;
         } catch (MVStoreException e) {

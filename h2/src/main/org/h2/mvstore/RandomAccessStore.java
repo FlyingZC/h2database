@@ -250,7 +250,7 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
             // quickly check latest 20 chunks referenced in meta table
             Queue<SFChunk> chunksToVerify = new PriorityQueue<>(20, Collections.reverseOrder(chunkComparator)); // 快速检查最近的 20 个在元数据表中引用的 chunk
             try {
-                setLastChunk(newest); // 设置最新的 chunk
+                setLastChunk(newest); // 设置最新的 chunk(1.磁盘读取chunk;2.创建 root page;3.设置 root page 到 mvMap)
                 // load the chunk metadata: although meta's root page resides in the lastChunk,
                 // traversing meta map might recursively load another chunk(s)
                 for (SFChunk c : getChunksFromLayoutMap()) {

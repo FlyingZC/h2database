@@ -467,7 +467,7 @@ public class MVStoreTool {
         }
     }
 
-    /**
+    /** 清理由于进程终止or电源故障中断的压缩操作
      * Clean up if needed, in a case a compact operation was interrupted due to
      * killing the process or a power failure. This will delete temporary files
      * (if any), and in case atomic file replacements were not used, rename the
@@ -477,11 +477,11 @@ public class MVStoreTool {
      */
     public static void compactCleanUp(String fileName) {
         String tempName = fileName + Constants.SUFFIX_MV_STORE_TEMP_FILE;
-        if (FileUtils.exists(tempName)) {
+        if (FileUtils.exists(tempName)) { // /home/flyingzc/test.mv.db.tempFile
             FileUtils.delete(tempName);
         }
         String newName = fileName + Constants.SUFFIX_MV_STORE_NEW_FILE;
-        if (FileUtils.exists(newName)) {
+        if (FileUtils.exists(newName)) { // /home/flyingzc/test.mv.db.newFile
             if (FileUtils.exists(fileName)) {
                 FileUtils.delete(newName);
             } else {

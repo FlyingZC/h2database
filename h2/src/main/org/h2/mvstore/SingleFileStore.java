@@ -109,12 +109,12 @@ public class SingleFileStore extends RandomAccessStore {
         }
         init(fileName, readOnly);
         try {
-            fileChannel = f.open(readOnly ? "r" : "rw"); // 打开 fileChannel
+            fileChannel = f.open(readOnly ? "r" : "rw"); // 1.打开 fileChannel
             if (encryptionTransformer != null) {
                 originalFileChannel = fileChannel;
                 fileChannel = encryptionTransformer.apply(fileChannel);
             }
-            fileLock = lockFileChannel(fileChannel, readOnly, fileName); // fileChannel 加文件锁
+            fileLock = lockFileChannel(fileChannel, readOnly, fileName); // 2.fileChannel 加文件锁
             saveChunkLock.lock();
             try {
                 setSize(fileChannel.size());

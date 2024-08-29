@@ -35,7 +35,7 @@ import org.h2.value.Value;
 import org.h2.value.ValueNull;
 import org.h2.value.VersionedValue;
 
-/**
+/** 二级索引.mvStore 里 索引的存储
  * An index stored in a MVStore.
  */
 public final class MVSecondaryIndex extends MVIndex<SearchRow, Value> {

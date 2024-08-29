@@ -52,9 +52,9 @@ public final class RootReference<K,V> {
 
 
     // This one is used to set root initially and for r/o snapshots
-    RootReference(Page<K,V> root, long version) {
-        this.root = root;
-        this.version = version;
+    RootReference(Page<K,V> root, long version) { // btree root 节点引用
+        this.root = root; // root page
+        this.version = version; // 根据 last chunk version 计算得到的当前 root page 的 version
         this.previous = null;
         this.updateCounter = 1;
         this.updateAttemptCounter = 1;

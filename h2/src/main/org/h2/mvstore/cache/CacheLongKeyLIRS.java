@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import org.h2.mvstore.DataUtils;
 
-/**
+/** 缓存
  * A scan resistant cache that uses keys of type long. It is meant to cache
  * objects that are relatively costly to acquire, for example file content.
  * <p>
@@ -140,7 +140,7 @@ public class CacheLongKeyLIRS<V> {
         return put(key, value, sizeOf(value));
     }
 
-    /**
+    /** 向缓存添加一个 entry,这个 entry 可能已经存在缓存中,也可能不存在
      * Add an entry to the cache. The entry may or may not exist in the
      * cache yet. This method will usually mark unknown entries as cold and
      * known entries as hot.
@@ -155,30 +155,30 @@ public class CacheLongKeyLIRS<V> {
             throw DataUtils.newIllegalArgumentException(
                     "The value may not be null");
         }
-        int hash = getHash(key);
-        int segmentIndex = getSegmentIndex(hash);
-        Segment<V> s = segments[segmentIndex];
+        int hash = getHash(key); // 计算 hash
+        int segmentIndex = getSegmentIndex(hash); // 定位 segment
+        Segment<V> s = segments[segmentIndex]; // 获取 segment
         // check whether resize is required: synchronize on s, to avoid
         // concurrent resizes (concurrent reads read
         // from the old segment)
         synchronized (s) {
-            s = resizeIfNeeded(s, segmentIndex);
-            return s.put(key, hash, value, memory);
+            s = resizeIfNeeded(s, segmentIndex); // 检查 segment 是否需要扩容
+            return s.put(key, hash, value, memory); // 向当前 segment 里 put
         }
     }
 
     private Segment<V> resizeIfNeeded(Segment<V> s, int segmentIndex) {
-        int newLen = s.getNewMapLen();
+        int newLen = s.getNewMapLen(); // 如果需要扩容,返回新的长度.否则返回0
         if (newLen == 0) {
             return s;
         }
         // another thread might have resized
         // (as we retrieved the segment before synchronizing on it)
-        Segment<V> s2 = segments[segmentIndex];
+        Segment<V> s2 = segments[segmentIndex];  // 在同步之前检索segment，另一个线程可能已经调整了大小
         if (s == s2) {
             // no other thread resized, so we do
-            s = new Segment<>(s, newLen);
-            segments[segmentIndex] = s;
+            s = new Segment<>(s, newLen); // 没有其他线程调整大小，当前线程进行调整
+            segments[segmentIndex] = s;  // 更新segments数组中的当前 segment
         }
         return s;
     }
@@ -797,7 +797,7 @@ public class CacheLongKeyLIRS<V> {
          * @return the old value, or null if there was no resident entry
          */
         synchronized V put(long key, int hash, V value, long memory) {
-            Entry<V> e = find(key, hash);
+            Entry<V> e = find(key, hash); // 查找缓存中是否存在相同 entry
             boolean existed = e != null;
             V old = null;
             if (existed) {

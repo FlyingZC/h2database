@@ -173,7 +173,7 @@ public final class MVStore implements AutoCloseable {
     private long updateCounter = 0;
     private long updateAttemptCounter = 0;
 
-    /**
+    /** 元数据映射.元数据变化较慢
      * The metadata map. Holds name -> id and id -> name and id -> metadata
      * mapping for all maps. This is relatively slow changing part of metadata
      */
@@ -255,7 +255,7 @@ public final class MVStore implements AutoCloseable {
         boolean fileStoreShallBeOpen = false;
         if (fileStore == null) {
             if (fileName != null) { // 没指定 fileStore 参数，但是指定了 fileName，默认使用 SingleFileStore 
-                fileStore = new SingleFileStore(config);
+                fileStore = new SingleFileStore(config); // 1.创建文件存储
                 fileStoreShallBeOpen = true;
             }
             fileStoreShallBeClosed = true;
@@ -1018,7 +1018,7 @@ public final class MVStore implements AutoCloseable {
      */
     <K,V> Page<K,V> readPage(MVMap<K,V> map, long pos) {
         checkNotClosed();
-        return fileStore.readPage(map, pos);
+        return fileStore.readPage(map, pos); // 通过文件存储读取 page
     }
 
     /**
@@ -1978,7 +1978,7 @@ public final class MVStore implements AutoCloseable {
             return set("compress", 2);
         }
 
-        /**
+        /** 设置 page 最大内存容量(byte),超过该容量对 page 拆分(默认 持久化存储为16KB，内存存储为4KB)
          * Set the amount of memory a page should contain at most, in bytes,
          * before it is split. The default is 16 KB for persistent stores and 4
          * KB for in-memory stores. This is not a limit in the page size, as

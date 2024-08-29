@@ -86,8 +86,8 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
 
     // meta map constructor
     MVMap(MVStore store, int id, DataType<K> keyType, DataType<V> valueType) {
-        this(store, keyType, valueType, id, 0, new AtomicReference<>(), store.getKeysPerPage(), false);
-        setInitialRoot(createEmptyLeaf(), store.getCurrentVersion());
+        this(store, keyType, valueType, id, 0, new AtomicReference<>(), store.getKeysPerPage(), false); // 1.初始化一些属性
+        setInitialRoot(createEmptyLeaf(), store.getCurrentVersion()); // 2.创建叶子节点; 3.设置 root reference
     }
 
     private MVMap(MVStore store, DataType<K> keyType, DataType<V> valueType, int id, long createVersion,
@@ -639,7 +639,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      *
      */
     final void setRootPos(long rootPos, long version) {
-        Page<K,V> root = readOrCreateRootPage(rootPos); // 读取或创建 root page
+        Page<K,V> root = readOrCreateRootPage(rootPos); // 1.读取或创建 root page
         if (root.map != this) { // 这种情况可能发生在并发打开现有 map 时
             // this can only happen on concurrent opening of existing map,
             // when second thread picks up some cached page already owned by
@@ -649,12 +649,12 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
             // let each map instance to have it's own copy
             root = root.copy(this, false); // 由于无法确定哪个线程会获胜，因此 copy root 让每个 map 实例拥有自己的副本
         }
-        setInitialRoot(root, version - 1); // 设置初始根页面和版本号
+        setInitialRoot(root, version - 1); // 2.设置初始根页面和版本号
         setWriteVersion(version);
     }
 
     private Page<K,V> readOrCreateRootPage(long rootPos) {
-        Page<K,V> root = rootPos == 0 ? createEmptyLeaf() : readPage(rootPos); // 根据根页位置rootPos, 决定是创建一个新的空叶页 or 读取已存在的页 作为根页
+        Page<K,V> root = rootPos == 0 ? createEmptyLeaf() : readPage(rootPos); // 根据根页位置 rootPos, 决定是创建一个新的空叶页 or 读取已存在的页 作为根页
         return root;
     }
 
@@ -851,7 +851,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      * @param version initial version
      */
     final void setInitialRoot(Page<K,V> rootPage, long version) {
-        root.set(new RootReference<>(rootPage, version));
+        root.set(new RootReference<>(rootPage, version)); // 1.创建 root reference; 2.原子set
     }
 
     /**

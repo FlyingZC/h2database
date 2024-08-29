@@ -16,7 +16,7 @@ import org.h2.compress.Compressor;
 import org.h2.mvstore.FileStore.PageSerializationManager;
 import org.h2.util.Utils;
 
-/**
+/** page 代表 btree 中的一个页面(叶子 or 非叶子节点)
  * A page (a node or a leaf).
  * <p>
  * For b-tree nodes, the key at a given index is larger than the largest key of
@@ -203,7 +203,7 @@ public abstract class Page<K,V> implements Cloneable {
      * @param memory the memory used in bytes
      * @return the page
      */
-    static <K,V> Page<K,V> createLeaf(MVMap<K,V> map, K[] keys, V[] values, int memory) {
+    static <K,V> Page<K,V> createLeaf(MVMap<K,V> map, K[] keys, V[] values, int memory) { // 创建叶子节点
         assert keys != null;
         Page<K,V> page = new Leaf<>(map, keys, values);
         page.initMemoryAccount(memory);
@@ -1462,7 +1462,7 @@ public abstract class Page<K,V> implements Cloneable {
 
 
 
-    private static class Leaf<K,V> extends Page<K,V> {
+    private static class Leaf<K,V> extends Page<K,V> { // 叶子节点, page 的子类
         /**
          * The storage for values.
          */

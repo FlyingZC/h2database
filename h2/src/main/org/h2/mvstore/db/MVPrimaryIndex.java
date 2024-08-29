@@ -34,7 +34,7 @@ import org.h2.value.ValueDecfloat;
 import org.h2.value.ValueLob;
 import org.h2.value.VersionedValue;
 
-/**
+/** 主键索引,表在mvStore里的存储
  * A table stored in a MVStore.
  */
 public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
@@ -85,7 +85,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
     }
 
     @Override
-    public void add(SessionLocal session, Row row) {
+    public void add(SessionLocal session, Row row) { // 添加行到主键索引
         if (mainIndexColumn == SearchRow.ROWID_INDEX) { // 为没有显式主键的行生成主键值
             if (row.getKey() == 0) {
                 row.setKey(lastKey.incrementAndGet());
