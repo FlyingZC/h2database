@@ -260,11 +260,11 @@ public abstract class FileStore<C extends Chunk<C>>
     }
 
     public final void bind(MVStore mvStore) {
-        if(this.mvStore != mvStore) {
+        if(this.mvStore != mvStore) { // 默认 bind 时创建的是空的 mvMap,只是为了和 mvStore 进行绑定
             long pos = layout == null ? 0L : layout.getRootPage().getPos();
             layout = new MVMap<>(mvStore, 0, StringDataType.INSTANCE, StringDataType.INSTANCE); // 1.创建空的 mvMap
-            layout.setRootPos(pos, mvStore.getCurrentVersion()); // root节点此时也是创建 empty 节点
-            this.mvStore = mvStore;
+            layout.setRootPos(pos, mvStore.getCurrentVersion()); // 1.1.root节点此时也是创建 empty 节点, version是0
+            this.mvStore = mvStore; // 2.绑定 mvStore
             mvStore.resetLastMapId(lastChunk == null ? 0 : lastChunk.mapId);
             mvStore.setCurrentVersion(lastChunkVersion());
         }
@@ -632,10 +632,10 @@ public abstract class FileStore<C extends Chunk<C>>
         long layoutRootPos = 0;
         if (last != null) { // there is a valid chunk
             lastChunkId = last.id;
-            layoutRootPos = last.layoutRootPos;
+            layoutRootPos = last.layoutRootPos; // chunk header 里存储了 map 的 root(元数据根页面(page)的位置)
             chunks.put(last.id, last); // 2.缓存最新的 chunk
         }
-        layout.setRootPos(layoutRootPos, lastChunkVersion()); // 3.设置 mvMap 的 root pos 为当前最新的 chunk
+        layout.setRootPos(layoutRootPos, lastChunkVersion()); // 3.获取当前 chunk version; 4.设置 mvMap 的 root pos 为当前最新的 chunk
     }
 
     protected final void registerDeadChunk(C chunk) {
@@ -907,13 +907,13 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     public MVMap<String, String> start() {
-        if (size() == 0) { // 存储为空
-            initializeCommonHeaderAttributes(mvStore.getTimeAbsolute()); // 初始化公共头部属性
-            initializeStoreHeader(mvStore.getTimeAbsolute()); // 初始化存储头部
-        } else {
+        if (size() == 0) { // 1.若存储为空
+            initializeCommonHeaderAttributes(mvStore.getTimeAbsolute()); // 1.1.初始化公共头部属性
+            initializeStoreHeader(mvStore.getTimeAbsolute()); // 1.2.初始化存储头部
+        } else { // 2.若存储文件不为空，则读取
             saveChunkLock.lock();
             try {
-                readStoreHeader(recoveryMode); // 从文件存储中读取 & 恢复 header
+                readStoreHeader(recoveryMode); // 2.1.从文件存储中读取 & 恢复 header
             } finally {
                 saveChunkLock.unlock();
             }
@@ -921,7 +921,7 @@ public abstract class FileStore<C extends Chunk<C>>
         lastCommitTime = getTimeSinceCreation();
         mvStore.resetLastMapId(lastMapId());
         mvStore.setCurrentVersion(lastChunkVersion());
-        MVMap<String, String> metaMap = mvStore.openMetaMap(); // 打开元数据映射
+        MVMap<String, String> metaMap = mvStore.openMetaMap(); // 3.打开元数据映射
         scrubLayoutMap(metaMap);
         return metaMap;
     }
@@ -1137,7 +1137,7 @@ public abstract class FileStore<C extends Chunk<C>>
     protected final C readChunkHeaderAndFooter(long block, int expectedId) {
         C header = readChunkHeaderOptionally(block, expectedId); // 读取 chunk header
         if (header != null) {
-            C footer = readChunkFooter(block + header.len); // 读取 chunk footer，根据 block 偏移量 + 当前 chunk 的 block 数量 定位
+            C footer = readChunkFooter(block + header.len); // 读取 chunk footer，根据 block 偏移量 + 当前 chunk 的 block 数量(header.len 记录了当前chunk的block数量) 定位
             if (footer == null || footer.id != expectedId || footer.block != header.block) { // 校验
                 return null;
             }
@@ -1956,7 +1956,7 @@ public abstract class FileStore<C extends Chunk<C>>
             }
             Page<K,V> page = readPageFromCache(pos); // 1.先从cache读取page
             if (page == null) { // cache 为空
-                C chunk = getChunk(pos); // 2.1.根据 position 读取 chunk
+                C chunk = getChunk(pos); // 2.1.根据 page position 计算 chunk id, 读取 page 对应的 chunk(一般是缓存)
                 int pageOffset = DataUtils.getPageOffset(pos); // 2.2.根据 position 提取 page offset
                 while(true) {
                     MVStoreException exception = null;
@@ -2004,7 +2004,7 @@ public abstract class FileStore<C extends Chunk<C>>
      * @return the chunk
      */
     private C getChunk(long pos) {
-        int chunkId = DataUtils.getPageChunkId(pos); // 根据位置计算chunk的ID
+        int chunkId = DataUtils.getPageChunkId(pos); // 根据位置计算 page 对应的 chunk ID
         C c = chunks.get(chunkId); // 从 chunks 缓存 map 中获取对应的 chunk
         if (c == null) { // 如果chunk不存在，则尝试从存储中加载
             String s = layout.get(Chunk.getMetaKey(chunkId)); // 获取chunk的元数据字符串

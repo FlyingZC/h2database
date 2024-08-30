@@ -190,27 +190,27 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
         // read the first two blocks
         ByteBuffer fileHeaderBlocks = readFully((SFChunk)null, 0, 2 * FileStore.BLOCK_SIZE); // 读取前两个块的数据到 ByteBuffer 中
         byte[] buff = new byte[FileStore.BLOCK_SIZE]; // 创建一个字节数组，用于存放单个块的内容
-        for (int i = 0; i <= FileStore.BLOCK_SIZE; i += FileStore.BLOCK_SIZE) { // 读取两个文件头，i+=BLOCK_SIZE
+        for (int i = 0; i <= FileStore.BLOCK_SIZE; i += FileStore.BLOCK_SIZE) { // 1.读取两个文件头，i+=BLOCK_SIZE
             fileHeaderBlocks.get(buff);
             // the following can fail for various reasons
             try {
-                HashMap<String, String> m = DataUtils.parseChecksummedMap(buff); // 解析属性map,里面会做checksum校验
+                HashMap<String, String> m = DataUtils.parseChecksummedMap(buff); // 1.1.解析文件头属性map,里面会做checksum校验
                 if (m == null) {
                     assumeCleanShutdown = false; // 如果 Map 解析失败，则认为不是干净关机
                     continue;
                 }
-                long version = DataUtils.readHexLong(m, FileStore.HDR_VERSION, 0); // 读取属性map里的version
+                long version = DataUtils.readHexLong(m, FileStore.HDR_VERSION, 0); // 1.1.1读取属性map里的version
                 // if both header blocks do agree on version
                 // we'll continue on happy path - assume that previous shutdown was clean
                 assumeCleanShutdown = assumeCleanShutdown && (newest == null || version == newest.version); // 如果两个头部块的版本号一致，则继续认为是干净关机
                 if (newest == null || version > newest.version) {
                     validStoreHeader = true;
                     storeHeader.putAll(m); // 存储 header
-                    int chunkId = DataUtils.readHexInt(m, FileStore.HDR_CHUNK, 0); // 读取文件头里的 chunk id
-                    long block = DataUtils.readHexLong(m, FileStore.HDR_BLOCK, 2); // 读取文件头里的 block 位置
-                    SFChunk test = readChunkHeaderAndFooter(block, chunkId); // 根据上面文件头里的 chunk 和 block,定位并读取 chunk 的头部和尾部信息，并进行校验
+                    int chunkId = DataUtils.readHexInt(m, FileStore.HDR_CHUNK, 0); // 1.1.2.读取文件头里的 chunk id
+                    long block = DataUtils.readHexLong(m, FileStore.HDR_BLOCK, 2); // 1.1.3.读取文件头里的 block 位置
+                    SFChunk test = readChunkHeaderAndFooter(block, chunkId); // 1.2.根据上面文件头里的 chunk 和 block,定位并读取 chunk 的头部和尾部信息，并进行校验
                     if (test != null) {
-                        newest = test; // 更新最新的 chunk
+                        newest = test; // 1.3.更新最新的 chunk
                     }
                 }
             } catch (Exception ignore) {
@@ -224,7 +224,7 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
                     "Store header is corrupt: {0}", this);
         }
 
-        processCommonHeaderAttributes(); // 处理通用的头部属性
+        processCommonHeaderAttributes(); // 2.处理通用的头部属性
 
         assumeCleanShutdown = assumeCleanShutdown && newest != null && !recoveryMode; // 再次确认是否为干净关机
         if (assumeCleanShutdown) {
@@ -250,7 +250,7 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
             // quickly check latest 20 chunks referenced in meta table
             Queue<SFChunk> chunksToVerify = new PriorityQueue<>(20, Collections.reverseOrder(chunkComparator)); // 快速检查最近的 20 个在元数据表中引用的 chunk
             try {
-                setLastChunk(newest); // 设置最新的 chunk(1.磁盘读取chunk;2.创建 root page;3.设置 root page 到 mvMap)
+                setLastChunk(newest); // 设置最新的 chunk(1.磁盘读取chunk(root page);2.创建 root page;3.设置 root page 到 mvMap)
                 // load the chunk metadata: although meta's root page resides in the lastChunk,
                 // traversing meta map might recursively load another chunk(s)
                 for (SFChunk c : getChunksFromLayoutMap()) {
@@ -341,8 +341,8 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
 
     @Override
     protected void initializeStoreHeader(long time) {
-        initializeCommonHeaderAttributes(time);
-        writeStoreHeader(); // 写出header到存储，可以打开16进制文本查看 ~/h2_test/data/test/TestMVStore
+        initializeCommonHeaderAttributes(time); // 1.初始化header属性
+        writeStoreHeader(); // 2.写出header到存储，可以打开16进制文本查看 ~/h2_test/data/test/TestMVStore
     }
 
     @Override

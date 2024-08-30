@@ -248,7 +248,7 @@ public final class MVStore implements AutoCloseable {
      *             occurred while opening
      * @throws IllegalArgumentException if the directory does not exist
      */
-    MVStore(Map<String, Object> config) {
+    MVStore(Map<String, Object> config) { // 创建 mvStore
         compressionLevel = DataUtils.getConfigParam(config, "compress", 0);
         String fileName = (String) config.get("fileName");
         FileStore<?> fileStore = (FileStore<?>) config.get("fileStore");
@@ -285,8 +285,8 @@ public final class MVStore implements AutoCloseable {
                     boolean readOnly = config.containsKey("readOnly");
                     fileStore.open(fileName, readOnly, encryptionKey); // 打开文件存储
                 }
-                fileStore.bind(this); // 绑定文件存储到当前 mvStore 实例
-                metaMap = fileStore.start(); // 启动文件存储，返回 MVMap
+                fileStore.bind(this); // 2.绑定文件存储到当前 mvStore 实例
+                metaMap = fileStore.start(); // 3.启动文件存储，返回 MVMap
             } catch (MVStoreException e) {
                 panic(e);
             } finally {

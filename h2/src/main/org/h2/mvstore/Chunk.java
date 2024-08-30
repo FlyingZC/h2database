@@ -118,7 +118,7 @@ public abstract class Chunk<C extends Chunk<C>> {
      */
     int collectPriority;
 
-    /**
+    /** chunk header 里存储的 元数据根页面(page)的位置
      * The position of the root of layout map.
      */
     long layoutRootPos;
@@ -182,7 +182,7 @@ public abstract class Chunk<C extends Chunk<C>> {
             mapId = DataUtils.readHexInt(map, ATTR_MAP, 0);
             maxLen = DataUtils.readHexLong(map, ATTR_MAX, 0);
             maxLenLive = DataUtils.readHexLong(map, ATTR_LIVE_MAX, maxLen);
-            layoutRootPos = DataUtils.readHexLong(map, ATTR_ROOT, 0);
+            layoutRootPos = DataUtils.readHexLong(map, ATTR_ROOT, 0); // 元数据根页面(page)的位置
             time = DataUtils.readHexLong(map, ATTR_TIME, 0);
             unused = DataUtils.readHexLong(map, ATTR_UNUSED, 0);
             unusedAtVersion = DataUtils.readHexLong(map, ATTR_UNUSED_AT_VERSION, 0);
