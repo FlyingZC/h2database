@@ -262,7 +262,7 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
                     }
                 }
                 SFChunk c;
-                while (assumeCleanShutdown && (c = chunksToVerify.poll()) != null) {
+                while (assumeCleanShutdown && (c = chunksToVerify.poll()) != null) { // 获取 chunks to verify
                     SFChunk test = readChunkHeaderAndFooter(c.block, c.id); // 校验 chunk header & footer
                     assumeCleanShutdown = test != null;
                     if (assumeCleanShutdown) {

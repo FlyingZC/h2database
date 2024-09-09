@@ -1083,7 +1083,7 @@ public abstract class FileStore<C extends Chunk<C>>
 
     private Iterable<C> getChunksFromLayoutMap(MVMap<String, String> layoutMap) {
         return () -> new Iterator<C>() {
-            private final Cursor<String, String> cursor = layoutMap.cursor(DataUtils.META_CHUNK);
+            private final Cursor<String, String> cursor = layoutMap.cursor(DataUtils.META_CHUNK); // 过滤出 layout 里 chunk 开头的 key value
             private C nextChunk;
 
             @Override
@@ -1446,15 +1446,15 @@ public abstract class FileStore<C extends Chunk<C>>
         }
     }
 
-    private void serializeToBuffer(WriteBuffer buff, ArrayList<Page<?, ?>> changed, C c, C previousChunk) {
+    private void serializeToBuffer(WriteBuffer buff, ArrayList<Page<?, ?>> changed, C c, C previousChunk) { // 将修改后的 page 序列化到 buffer
         // need to patch the header later
-        int headerLength = c.estimateHeaderSize();
+        int headerLength = c.estimateHeaderSize(); // 预留头部长度，待会填充
         buff.position(headerLength);
         c.next = headerLength;
 
         long version = c.version;
-        PageSerializationManager pageSerializationManager = new PageSerializationManager(c, buff);
-        for (Page<?,?> p : changed) {
+        PageSerializationManager pageSerializationManager = new PageSerializationManager(c, buff); // 创建 page 序列化管理器,递归写入 page
+        for (Page<?,?> p : changed) { // 遍历变更后的 pages,写入 buffer
             String key = MVMap.getMapRootKey(p.getMapId());
             if (p.getTotalCount() == 0) {
                 layout.remove(key);

@@ -236,13 +236,13 @@ public abstract class Chunk<C extends Chunk<C>> {
         throw DataUtils.newMVStoreException(DataUtils.ERROR_FILE_CORRUPT, "Not a valid chunk header");
     }
 
-    /**
+    /** 写出 chunk header
      * Write the chunk header.
      *
      * @return estimated size of the header
      */
     int estimateHeaderSize() {
-        byte[] headerBytes = getHeaderBytes();
+        byte[] headerBytes = getHeaderBytes(); // 获取 header 的字节表示
         int headerLength = headerBytes.length;
         // Initial chunk will look like (length-wise) something in between those two lines:
         // chunk:0,len:0,pages:0,max:0,map:0,root:0,time:0,version:0                                      // 57
@@ -252,7 +252,7 @@ public abstract class Chunk<C extends Chunk<C>> {
         // which do not exist in initial header or may grow from their initial values:
         // len:0[fffffff],pages:0[fffffff][,pinCount:ffffffff],max:0[fffffffffffffff],map:0[fffffff],
         // root:0[fffffffffffffff,next:ffffffffffffffff,toc:fffffffff]                       // 104 extra chars
-        return headerLength + 104 + 1; // extra one for the terminator
+        return headerLength + 104 + 1; // extra one for the terminator // 返回 header 的估计大小，加上完全形成后的额外字符数，再加上一个终止符的长度
     }
 
     /**
@@ -384,7 +384,7 @@ public abstract class Chunk<C extends Chunk<C>> {
         if (tocPos > 0) {
             DataUtils.appendMap(buff, ATTR_TOC, tocPos);
         }
-        return buff.toString().getBytes(StandardCharsets.ISO_8859_1);
+        return buff.toString().getBytes(StandardCharsets.ISO_8859_1); // 返回 header 的 byte[]
     }
 
     byte[] getFooterBytes() {

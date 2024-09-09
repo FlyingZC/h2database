@@ -156,7 +156,7 @@ public final class MVStore implements AutoCloseable {
      */
     private final ReentrantLock storeLock = new ReentrantLock(true);
 
-    /**
+    /** store 操作正在进行中
      * Flag to refine the state under storeLock.
      * It indicates that store() operation is running, and we have to prevent possible re-entrance.
      */
@@ -283,10 +283,10 @@ public final class MVStore implements AutoCloseable {
             try {
                 if (fileStoreShallBeOpen) {
                     boolean readOnly = config.containsKey("readOnly");
-                    fileStore.open(fileName, readOnly, encryptionKey); // 打开文件存储
+                    fileStore.open(fileName, readOnly, encryptionKey); // 2.打开文件存储
                 }
-                fileStore.bind(this); // 2.绑定文件存储到当前 mvStore 实例
-                metaMap = fileStore.start(); // 3.启动文件存储，返回 MVMap
+                fileStore.bind(this); // 3.绑定文件存储到当前 mvStore 实例
+                metaMap = fileStore.start(); // 4.启动文件存储，返回 MVMap
             } catch (MVStoreException e) {
                 panic(e);
             } finally {
@@ -788,7 +788,7 @@ public final class MVStore implements AutoCloseable {
         // we need to prevent re-entrance, which may be possible,
         // because meta map is modified within storeNow() and that
         // causes beforeWrite() call with possibility of going back here
-        return !storeLock.isHeldByCurrentThread() || !storeOperationInProgress.get();
+        return !storeLock.isHeldByCurrentThread() || !storeOperationInProgress.get(); // 1.检查 store lock 是否被当前线程持有; 2.检查 store 操作是否进行中标识
     }
 
     private long store(boolean syncWrite) {
@@ -854,10 +854,10 @@ public final class MVStore implements AutoCloseable {
         }
     }
 
-    private ArrayList<Page<?,?>> collectChangedMapRoots(long version) {
+    private ArrayList<Page<?,?>> collectChangedMapRoots(long version) { // 收集自上次保存以来有更改的MVMap根页面
         long lastStoredVersion = version - 2;
         ArrayList<Page<?,?>> changed = new ArrayList<>();
-        for (Iterator<MVMap<?, ?>> iter = maps.values().iterator(); iter.hasNext(); ) {
+        for (Iterator<MVMap<?, ?>> iter = maps.values().iterator(); iter.hasNext(); ) { // 遍历 mvMaps
             MVMap<?, ?> map = iter.next();
             RootReference<?,?> rootReference = map.setWriteVersion(version);
             if (rootReference == null) {

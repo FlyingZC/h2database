@@ -2122,4 +2122,19 @@ public class TestMVStore extends TestBase {
     public void test02_example() throws Exception {
         testExample();
     }
+    
+    @Test
+    public void test03_commit_rollback() throws Exception {
+        String fileName = getBaseDir() + "/" + getTestName();
+        FileUtils.delete(fileName);
+        // open the store (in-memory if fileName is null)
+        try (MVStore s = MVStore.open(fileName)) {
+            MVMap<Integer, String> map = s.openMap("data");
+            map.put(1, "Hello World");
+            s.commit();
+            map.put(2, "Hello World2");
+            s.rollback();
+            System.out.println();
+        }
+    }
 }

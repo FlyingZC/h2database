@@ -747,7 +747,7 @@ public final class DataUtils {
         appendMapKey(buff, key).append(Long.toHexString(value));
     }
 
-    /**
+    /** 追加 key-value 到 buffer
      * Append a key-value pair to the string builder. Keys may not contain a
      * colon.
      *

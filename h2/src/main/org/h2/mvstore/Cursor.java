@@ -49,7 +49,7 @@ public final class Cursor<K,V> implements Iterator<K> {
             while (current == null) {
                 Page<K,V> page = cursorPos.page;
                 int index = cursorPos.index;
-                if (reverse ? index < 0 : index >= upperBound(page)) {
+                if (reverse ? index < 0 : index >= upperBound(page)) { // 判断是否到达当前page的边界
                     // traversal of this page is over, going up a level or stop if at the root already
                     CursorPos<K,V> tmp = cursorPos;
                     cursorPos = cursorPos.parent;
