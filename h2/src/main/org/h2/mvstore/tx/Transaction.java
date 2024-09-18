@@ -103,12 +103,12 @@ public final class Transaction {
      */
     final long sequenceNum;
 
-    /*
+    /* 事务状态是一个原子复合字段：
      * Transaction state is an atomic composite field:
-     * bit  45      : flag whether transaction had rollback(s)
-     * bits 44-41   : status
-     * bits 40      : overflow control bit, 1 indicates overflow
-     * bits 39-0    : log id of the last entry in the undo log map
+     * bit  45      : flag whether transaction had rollback(s) 位 45：标记事务是否有回滚
+     * bits 44-41   : status 位 44-41：状态位
+     * bits 40      : overflow control bit, 1 indicates overflow 40：溢出控制位，1 表示溢出
+     * bits 39-0    : log id of the last entry in the undo log map 位 39-0：撤消日志 map 中最后一个条目的日志 ID
      */
     private final AtomicLong statusAndLogId;
 
@@ -165,7 +165,7 @@ public final class Transaction {
      */
     private RootReference<Long,Record<?,?>>[] undoLogRootReferences;
 
-    /**
+    /** 事务 id -> transaction map
      * Map of transactional maps for this transaction
      */
     private final Map<Integer, TransactionMap<?,?>> transactionMaps = new HashMap<>();
@@ -206,7 +206,7 @@ public final class Transaction {
         return undoLogRootReferences;
     }
 
-    /**
+    /** 将事务状态更改为指定值
      * Changes transaction status to a specified value
      * @param status to be set
      * @return transaction state as it was before status change
@@ -453,11 +453,11 @@ public final class Transaction {
     public <K, V> TransactionMap<K, V> openMap(String name,
                                                 DataType<K> keyType,
                                                 DataType<V> valueType) {
-        MVMap<K, VersionedValue<V>> map = store.openVersionedMap(name, keyType, valueType);
+        MVMap<K, VersionedValue<V>> map = store.openVersionedMap(name, keyType, valueType); // open mv map, value 存的是 versioned value
         return openMapX(map);
     }
 
-    /**
+    /** 打开给定map的事务版本
      * Open the transactional version of the given map.
      *
      * @param <K> the key type
@@ -469,7 +469,7 @@ public final class Transaction {
     public <K, V> TransactionMap<K,V> openMapX(MVMap<K,VersionedValue<V>> map) {
         checkNotClosed();
         int id = map.getId();
-        TransactionMap<K,V> transactionMap = (TransactionMap<K,V>)transactionMaps.get(id);
+        TransactionMap<K,V> transactionMap = (TransactionMap<K,V>)transactionMaps.get(id); // transaction 缓存
         if (transactionMap == null) {
             transactionMap = new TransactionMap<>(this, map);
             transactionMaps.put(id, transactionMap);
@@ -486,7 +486,7 @@ public final class Transaction {
         store.storeTransaction(this);
     }
 
-    /**
+    /** 提交事务。随后，本次事务结束。
      * Commit the transaction. Afterwards, this transaction is closed.
      */
     public void commit() {
@@ -792,14 +792,14 @@ public final class Transaction {
         return getLogId(state) != 0;
     }
 
-    private static long composeState(int status, long logId, boolean hasRollback) {
+    private static long composeState(int status, long logId, boolean hasRollback) { // 组合状态值
         assert logId < LOG_ID_LIMIT : logId;
         assert (status & ~STATUS_MASK) == 0 : status;
 
         if (hasRollback) {
-            status |= 1 << STATUS_BITS;
+            status |= 1 << STATUS_BITS; // 如果有回滚操作，则在状态码中设置回滚标志位
         }
-        return ((long)status << LOG_ID_BITS1) | logId;
+        return ((long)status << LOG_ID_BITS1) | logId;  // 返回组合后的状态值，状态码左移后与日志ID进行按位或操作
     }
 
     private static String getStatusName(int status) {

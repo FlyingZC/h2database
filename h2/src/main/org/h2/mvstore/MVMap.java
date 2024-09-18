@@ -39,7 +39,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      */
     public final MVStore store;
 
-    /**
+    /** 指向当前 root page
      * Reference to the current root page.
      */
     private final AtomicReference<RootReference<K,V>> root;
@@ -74,7 +74,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                 ((MVStore) config.get("store")).getKeysPerPage(),
                 config.containsKey("singleWriter") && (Boolean) config.get("singleWriter")
         );
-        setInitialRoot(createEmptyLeaf(), store.getCurrentVersion());
+        setInitialRoot(createEmptyLeaf(), store.getCurrentVersion()); // 创建空的叶子节点,作为 root 节点
     }
 
     // constructor for cloneIt()
@@ -404,7 +404,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
     }
 
 
-    /**
+    /** 根据 key 获取 value
      * Get the value for the given key, or null if not found.
      *
      * @param key the key
@@ -414,10 +414,10 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
     @SuppressWarnings("unchecked")
     @Override
     public final V get(Object key) {
-        return get(getRootPage(), (K) key);
+        return get(getRootPage(), (K) key); // 1.找到 root page; 2.从 root page 开始查找
     }
 
-    /**
+    /** 从快照中获取给定 key 的 value，如果未找到，则获取 null
      * Get the value for the given key from a snapshot, or null if not found.
      *
      * @param p the root of a snapshot
@@ -831,7 +831,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         return root.get();
     }
 
-    /**
+    /** 获取根引用，刷新任何当前的追加缓冲区
      * Get the root reference, flushing any current append buffer.
      *
      * @return current root reference
@@ -844,7 +844,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         return rootReference;
     }
 
-    /**
+    /** 设置初始根节点
      * Set the initial root.
      *
      * @param rootPage root page
@@ -945,7 +945,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         return isVolatile;
     }
 
-    /**
+    /** 在写入地图之前调用此方法。默认实现检查是否允许写入，并尝试检测并发修改。
      * This method is called before writing to the map. The default
      * implementation checks whether writing is allowed, and tries
      * to detect concurrent modification.
@@ -1158,7 +1158,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         }
     }
 
-    /**
+    /** 创建空叶节点页面
      * Create empty leaf node page.
      *
      * @return new page
@@ -1366,7 +1366,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         return replacement;
     }
 
-    /**
+    /** 将条目附加到此地图。此方法不是线程安全的，既不能同时使用，也不能与更新此映射的任何方法结合使用。  可以同时使用非更新方法，但不保证最新附加值可见。
      * Appends entry to this map. this method is NOT thread safe and can not be used
      * neither concurrently, nor in combination with any method that updates this map.
      * Non-updating method may be used concurrently, but latest appended values
@@ -1734,7 +1734,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         public void reset() {}
     }
 
-    /**
+    /** 添加、替换或删除键值对
      * Add, replace or remove a key-value pair.
      *
      * @param key the key (may not be null)
@@ -1746,7 +1746,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         IntValueHolder unsavedMemoryHolder = new IntValueHolder();
         int attempt = 0;
         while(true) {
-            RootReference<K,V> rootReference = flushAndGetRoot();
+            RootReference<K,V> rootReference = flushAndGetRoot(); // 1.获取 mvMap 根节点
             boolean locked = rootReference.isLockedByCurrentThread();
             if (!locked) {
                 if (attempt++ == 0) {
@@ -1763,7 +1763,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
             V result;
             unsavedMemoryHolder.value = 0;
             try {
-                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 从根节点开始，根据key遍历tree,找到key的位置
+                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 2.从根节点开始，根据key遍历tree,找到key的位置
                 if (!locked && rootReference != getRoot()) {
                     continue;
                 }
@@ -1860,7 +1860,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                         break;
                     }
                 }
-                rootPage = replacePage(pos, p, unsavedMemoryHolder); // 替换page
+                rootPage = replacePage(pos, p, unsavedMemoryHolder); // 替换 root page
                 if (!locked) { // 未上锁
                     rootReference = rootReference.updateRootPage(rootPage, attempt); // 更新 root page 引用
                     if (rootReference == null) { // 没有更新成功

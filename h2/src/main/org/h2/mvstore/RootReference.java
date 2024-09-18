@@ -45,7 +45,7 @@ public final class RootReference<K,V> {
      * Counter for attempted root updates.
      */
     final long updateAttemptCounter;
-    /**
+    /** 追加缓冲区占用部分的大小
      * Size of the occupied part of the append buffer.
      */
     private final byte appendCounter;

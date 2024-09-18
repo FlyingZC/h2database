@@ -30,7 +30,7 @@ import org.h2.util.StringUtils;
 import org.h2.value.VersionedValue;
 
 /**
- * A store that supports concurrent MVCC read-committed transactions.
+ * A store that supports concurrent MVCC read-committed transactions.支持并发 MVCC 读已提交 事务 的存储
  */
 public class TransactionStore {
 
@@ -44,7 +44,7 @@ public class TransactionStore {
      */
     final int timeoutMillis;
 
-    /**
+    /** prepared 事务
      * The persisted map of prepared transactions.
      * Key: transactionId, value: [ status, name ].
      */
@@ -54,7 +54,7 @@ public class TransactionStore {
 
     /**
      * Undo logs.
-     * <p>
+     * <p> 如果事务的第一个条目的 logId 不为 0，则事务已部分提交（这意味着无法回滚）。日志条目在数据更改之前写入（预写）
      * If the first entry for a transaction doesn't have a logId
      * of 0, then the transaction is partially committed (which means rollback
      * is not possible). Log entries are written before the data is changed
@@ -68,14 +68,14 @@ public class TransactionStore {
 
     private final DataType<?> dataType;
 
-    /**
+    /** 该 BitSet 用作 transactions[] 中 transaction slots 的空闲指示器。  它提供了找到第一个未占用插槽的简单方法，并且还允许进行写时复制非阻塞更新。
      * This BitSet is used as vacancy indicator for transaction slots in transactions[].
      * It provides easy way to find first unoccupied slot, and also allows for copy-on-write
      * non-blocking updates.
      */
     final AtomicReference<VersionedBitSet> openTransactions = new AtomicReference<>(new VersionedBitSet());
 
-    /**
+    /** 这是有关正在提交的交易的最终真相的来源(用来确定事务是否提交中)。  一旦设置了位，相应的事务就会在逻辑上提交，尽管在各种映射中可能有大量“未提交”条目并且撤消记录仍然存在。  然而，所有这些都应被其他事务视为已提交。
      * This is intended to be the source of ultimate truth about transaction being committed.
      * Once bit is set, corresponding transaction is logically committed,
      * although it might be plenty of "uncommitted" entries in various maps
@@ -92,7 +92,7 @@ public class TransactionStore {
      */
     private int maxTransactionId = MAX_OPEN_TRANSACTIONS;
 
-    /**
+    /** 持有所有打开的事务对象
      * Array holding all open transaction objects.
      * Position in array is "transaction id".
      * VolatileReferenceArray would do the job here, but there is no such thing in Java yet
@@ -118,7 +118,7 @@ public class TransactionStore {
     // TODO: introduce constructor parameter instead of a static field, driven by URL parameter
     private static final int MAX_OPEN_TRANSACTIONS = 65535;
 
-    /**
+    /** 根据 transaction id 生成 undo log name
      * Generate a string used to name undo log map for a specific transaction.
      * This name will contain transaction id.
      *
@@ -175,7 +175,7 @@ public class TransactionStore {
         return store.openMap(TYPE_REGISTRY_NAME, typeRegistryBuilder);
     }
 
-    /**
+    /** 初始化存储而不使用任何 RollbackListener
      * Initialize the store without any RollbackListener.
      * @see #init(RollbackListener)
      */
@@ -192,19 +192,19 @@ public class TransactionStore {
      */
     public void init(RollbackListener listener) {
         if (!init) {
-            for (String mapName : store.getMapNames()) {
-                if (mapName.startsWith(UNDO_LOG_NAME_PREFIX)) {
+            for (String mapName : store.getMapNames()) { // 1.遍历 mv map names
+                if (mapName.startsWith(UNDO_LOG_NAME_PREFIX)) { // 2.若有 undo log map
                     // Unexpectedly short name may be encountered upon upgrade from older version
                     // where undo log was persisted as a single map, remove it.
                     if (mapName.length() > UNDO_LOG_NAME_PREFIX.length()) {
                         // make a decision about tx status based on a log name
                         // to handle upgrade from a previous versions
-                        boolean committed = mapName.charAt(UNDO_LOG_NAME_PREFIX.length()) == UNDO_LOG_COMMITTED;
+                        boolean committed = mapName.charAt(UNDO_LOG_NAME_PREFIX.length()) == UNDO_LOG_COMMITTED; // 3.根据 undo log 名称判断事务状态是否已经提交
                         if (store.hasData(mapName)) {
                             int transactionId = StringUtils.parseUInt31(mapName, UNDO_LOG_NAME_PREFIX.length() + 1,
-                                    mapName.length());
+                                    mapName.length()); // 解析事务id
                             VersionedBitSet openTxBitSet = openTransactions.get();
-                            if (!openTxBitSet.get(transactionId)) {
+                            if (!openTxBitSet.get(transactionId)) { //  如果事务不在进行中，则处理事务状态
                                 Object[] data = preparedTransactions.get(transactionId);
                                 int status;
                                 String name;
@@ -215,13 +215,13 @@ public class TransactionStore {
                                     status = (Integer) data[0];
                                     name = (String) data[1];
                                 }
-                                MVMap<Long, Record<?,?>> undoLog = store.openMap(mapName, undoLogBuilder);
+                                MVMap<Long, Record<?,?>> undoLog = store.openMap(mapName, undoLogBuilder); // 打开 undo log mv map
                                 undoLogs[transactionId] = undoLog;
                                 Long lastUndoKey = undoLog.lastKey();
                                 assert lastUndoKey != null;
                                 assert getTransactionId(lastUndoKey) == transactionId;
                                 long logId = getLogId(lastUndoKey) + 1;
-                                if (committed) {
+                                if (committed) { // 判断并处理已提交的事务
                                     // give it a proper name and used marker record instead
                                     store.renameMap(undoLog, getUndoLogName(transactionId));
                                     markUndoLogAsCommitted(transactionId);
@@ -251,10 +251,10 @@ public class TransactionStore {
     }
 
     private void markUndoLogAsCommitted(int transactionId) {
-        addUndoLogRecord(transactionId, LOG_ID_MASK, Record.COMMIT_MARKER);
+        addUndoLogRecord(transactionId, LOG_ID_MASK, Record.COMMIT_MARKER); // 标记 undo log 为 committed
     }
 
-    /**
+    /** 提交所有处于已提交状态的事务，并回滚所有非 prepared 的事务。
      * Commit all transactions that are in the committed state, and
      * rollback all open transactions.
      */
@@ -398,7 +398,7 @@ public class TransactionStore {
         do {
             VersionedBitSet original = openTransactions.get();
             if (txId == 0) {
-                transactionId = original.nextClearBit(1); // 获取事务 id
+                transactionId = original.nextClearBit(1); // 获取事务 id(bit set占位)
             } else {
                 transactionId = txId;
                 assert !original.get(transactionId);
@@ -409,23 +409,23 @@ public class TransactionStore {
                         "There are {0} open transactions",
                         transactionId - 1);
             }
-            VersionedBitSet clone = original.clone();
-            clone.set(transactionId);
-            sequenceNo = clone.getVersion() + 1;
-            clone.setVersion(sequenceNo);
-            success = openTransactions.compareAndSet(original, clone); // cas 原子更新 openTransactions 对象 
+            VersionedBitSet clone = original.clone(); // bit set clone
+            clone.set(transactionId); // 设置 transaction id 到 bit set 指定下标
+            sequenceNo = clone.getVersion() + 1; // bit set version 自增
+            clone.setVersion(sequenceNo); // 设置 version
+            success = openTransactions.compareAndSet(original, clone); // cas 原子更新 openTransactions bit set 对象 
         } while(!success); // 更新不成功重试
 
         Transaction transaction = new Transaction(this, transactionId, sequenceNo, status, name, logId,
-                timeoutMillis, ownerId, isolationLevel, listener);
+                timeoutMillis, ownerId, isolationLevel, listener); // 创建事务对象
 
         assert transactions.get(transactionId) == null;
-        transactions.set(transactionId, transaction);
+        transactions.set(transactionId, transaction); // 设置事务对象到 transactions 数组缓存的指定下标 
 
         if (undoLogs[transactionId] == null) { // 若 undo log 指定位置没有初始化
-            String undoName = getUndoLogName(transactionId);
+            String undoName = getUndoLogName(transactionId); // 根据 transaction id 生成 undo name
             MVMap<Long,Record<?,?>> undoLog = store.openMap(undoName, undoLogBuilder); // 创建存储 undo log 的 mvMap
-            undoLogs[transactionId] = undoLog;
+            undoLogs[transactionId] = undoLog; // undo logs 数组 transactionId 下标放入 undoLog 
         }
         return transaction;
     }
@@ -483,7 +483,7 @@ public class TransactionStore {
         store.removeMap(map.map);
     }
 
-    /**
+    /** 提交事务
      * Commit a transaction.
      *  @param t transaction to commit
      *  @param recovery if called during initial transaction recovery procedure
@@ -492,7 +492,7 @@ public class TransactionStore {
     void commit(Transaction t, boolean recovery) {
         if (!store.isClosed()) {
             int transactionId = t.transactionId;
-            // First, mark log as "committed".
+            // First, mark log as "committed". 1.首先，将 undo log 日志标记为“已提交”。它不会改变其他事务处理此事务的方式，但会在突然终止的情况下保留提交事实。
             // It does not change the way this transaction is treated by others,
             // but preserves fact of commit in case of abrupt termination.
             MVMap<Long,Record<?,?>> undoLog = undoLogs[transactionId];
@@ -502,22 +502,22 @@ public class TransactionStore {
                 cursor = undoLog.cursor(null);
             } else {
                 cursor = undoLog.cursor(null);
-                markUndoLogAsCommitted(transactionId);
+                markUndoLogAsCommitted(transactionId); // 标记 undo log 提交
             }
 
             // this is an atomic action that causes all changes
             // made by this transaction, to be considered as "committed"
-            flipCommittingTransactionsBit(transactionId, true);
+            flipCommittingTransactionsBit(transactionId, true);  // 2.标记所有事务更改为“已提交”的原子操作
 
             CommitDecisionMaker<Object> commitDecisionMaker = new CommitDecisionMaker<>();
             try {
-                while (cursor.hasNext()) {
-                    Long undoKey = cursor.next();
-                    Record<?,?> op = cursor.getValue();
-                    int mapId = op.mapId;
-                    MVMap<Object, VersionedValue<Object>> map = openMap(mapId);
+                while (cursor.hasNext()) { // 3.遍历 undo log
+                    Long undoKey = cursor.next(); // undo log key
+                    Record<?,?> op = cursor.getValue(); // undo log 操作
+                    int mapId = op.mapId; // 4.undo log 操作涉及的 map id
+                    MVMap<Object, VersionedValue<Object>> map = openMap(mapId); // 5.打开 mvMap
                     if (map != null && !map.isClosed()) { // might be null if map was removed later
-                        Object key = op.key;
+                        Object key = op.key; // 当前 undo log 操作的 key
                         commitDecisionMaker.setUndoKey(undoKey);
                         // second parameter (value) is not really
                         // used by CommitDecisionMaker
@@ -534,7 +534,7 @@ public class TransactionStore {
         }
     }
 
-    private void flipCommittingTransactionsBit(int transactionId, boolean flag) {
+    private void flipCommittingTransactionsBit(int transactionId, boolean flag) { // cas 设置当前事务已提交到 committingTransactions
         boolean success;
         do {
             BitSet original = committingTransactions.get();

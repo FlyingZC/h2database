@@ -1479,7 +1479,7 @@ public abstract class Page<K,V> implements Cloneable {
 
         Leaf(MVMap<K,V> map, K[] keys, V[] values) {
             super(map, keys);
-            this.values = values;
+            this.values = values; // 叶子节点存储 values
         }
 
         @Override
@@ -1557,9 +1557,9 @@ public abstract class Page<K,V> implements Cloneable {
         }
 
         @Override
-        public V setValue(int index, V value) {
+        public V setValue(int index, V value) { // 当前 page 指定 index 设置 value
             values = values.clone();
-            V old = setValueInternal(index, value);
+            V old = setValueInternal(index, value); // 设置值,返回旧值
             if(isPersistent()) {
                 if (!map.isMemoryEstimationAllowed()) {
                     addMemory(map.evaluateMemoryForValue(value) -

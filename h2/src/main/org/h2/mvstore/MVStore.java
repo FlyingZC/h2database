@@ -178,9 +178,9 @@ public final class MVStore implements AutoCloseable {
      * mapping for all maps. This is relatively slow changing part of metadata
      */
     private final MVMap<String, String> meta;
-
+    // map id -> mvMap 缓存
     private final ConcurrentHashMap<Integer, MVMap<?, ?>> maps = new ConcurrentHashMap<>();
-
+    // 最新 map id 计数，每次分配 map 时 id 自增
     private final AtomicInteger lastMapId = new AtomicInteger();
 
     private int versionsToKeep = 5;
@@ -286,7 +286,7 @@ public final class MVStore implements AutoCloseable {
                     fileStore.open(fileName, readOnly, encryptionKey); // 2.打开文件存储
                 }
                 fileStore.bind(this); // 3.绑定文件存储到当前 mvStore 实例
-                metaMap = fileStore.start(); // 4.启动文件存储，返回 MVMap
+                metaMap = fileStore.start(); // 4.启动文件存储，返回 MVMap (meta map)
             } catch (MVStoreException e) {
                 panic(e);
             } finally {
@@ -405,7 +405,7 @@ public final class MVStore implements AutoCloseable {
         return openMap(name, new MVMap.Builder<>());
     }
 
-    /**
+    /** 使用给定的构建器打开 mvMap。如果 mvMap 尚不存在，则会自动创建。如果具有该名称的 mvMap 已打开，则返回该 mvMap。
      * Open a map with the given builder. The map is automatically create if it
      * does not yet exist. If a map with this name is already open, this map is
      * returned.
@@ -418,7 +418,7 @@ public final class MVStore implements AutoCloseable {
      * @return the map
      */
     public <M extends MVMap<K, V>, K, V> M openMap(String name, MVMap.MapBuilder<M, K, V> builder) {
-        int id = getMapId(name);
+        int id = getMapId(name); // 1.获取 map id
         if (id >= 0) {
             @SuppressWarnings("unchecked")
             M map = (M) getMap(id);
@@ -431,24 +431,24 @@ public final class MVStore implements AutoCloseable {
             return map;
         } else {
             HashMap<String, Object> c = new HashMap<>();
-            id = getNextMapId();
+            id = getNextMapId(); // 2.获取新分配的 map id
             assert getMap(id) == null;
             c.put("id", id);
             long curVersion = currentVersion;
             c.put("createVersion", curVersion);
-            M map = builder.create(this, c);
+            M map = builder.create(this, c); // 3.通过 builder 创建 map
             String x = Integer.toHexString(id);
-            meta.put(MVMap.getMapKey(id), map.asString(name));
+            meta.put(MVMap.getMapKey(id), map.asString(name)); // 4.mvMap 信息缓存到 meta 里, map key -> map string
             String existing = meta.putIfAbsent(DataUtils.META_NAME + name, x);
             if (existing != null) {
                 // looks like map was created concurrently, cleanup and re-start
                 meta.remove(MVMap.getMapKey(id));
                 return openMap(name, builder);
             }
-            map.setRootPos(0, curVersion);
+            map.setRootPos(0, curVersion); // 5.设置 root pos
             markMetaChanged();
             @SuppressWarnings("unchecked")
-            M existingMap = (M) maps.putIfAbsent(id, map);
+            M existingMap = (M) maps.putIfAbsent(id, map); // 放入 mvMap 缓存
             if (existingMap != null) {
                 map = existingMap;
             }
@@ -500,7 +500,7 @@ public final class MVStore implements AutoCloseable {
         return map;
     }
 
-    /**
+    /** 从 meta map 里获取所有 mvMap names
      * Get the set of all map names.
      *
      * @return the set of names
@@ -1525,9 +1525,9 @@ public final class MVStore implements AutoCloseable {
         return m == null ? null : DataUtils.getMapName(m);
     }
 
-    private int getMapId(String name) {
-        String m = meta.get(DataUtils.META_NAME + name);
-        return m == null ? -1 : DataUtils.parseHexInt(m);
+    private int getMapId(String name) { // 从 meta map 里获取 map id
+        String m = meta.get(DataUtils.META_NAME + name); // name.xxx
+        return m == null ? -1 : DataUtils.parseHexInt(m); // 查询不到返回 -1
     }
 
     public void populateInfo(BiConsumer<String, String> consumer) {

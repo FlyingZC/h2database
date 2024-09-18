@@ -12,7 +12,7 @@ import org.h2.mvstore.MVMap.Decision;
 import org.h2.mvstore.type.DataType;
 import org.h2.value.VersionedValue;
 
-/**
+/** 用于 transaction map 的修改
  * Class TxDecisionMaker is a base implementation of MVMap.DecisionMaker
  * to be used for TransactionMap modification.
  *

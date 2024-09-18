@@ -24,7 +24,7 @@ import org.h2.mvstore.RootReference;
 import org.h2.mvstore.type.DataType;
 import org.h2.value.VersionedValue;
 
-/**
+/** 支持事务的 map
  * A map that supports transactions.
  *
  * <p>
@@ -83,7 +83,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         this.lockDecisionMaker = transaction.allowNonRepeatableRead()
                 ? new TxDecisionMaker.LockDecisionMaker<>(map.getId(), transaction)
                 : new TxDecisionMaker.RepeatableReadLockDecisionMaker<>(map.getId(), transaction,
-                        map.getValueType(), this::getFromSnapshot);
+                        map.getValueType(), this::getFromSnapshot); // 允许不可重复读 ? lock : repeatable read lock
 
     }
 
@@ -248,7 +248,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         return set((K)key, (V)null);
     }
 
-    /**
+    /** 更新给定键的值。<p> 如果该行被锁定，此方法将重试，直到该行可以更新或直到锁定超时。
      * Update the value for the given key.
      * <p>
      * If the row is locked, this method will retry until the row could be
