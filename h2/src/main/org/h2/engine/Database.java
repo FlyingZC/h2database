@@ -323,7 +323,7 @@ public final class Database implements DataHandler, CastDataProvider {
             }
             starting = true;
             if (dbSettings.mvStore) {
-                store = new Store(this, ci.getFileEncryptionKey());
+                store = new Store(this, ci.getFileEncryptionKey()); // 1.创建 mvStore
             } else {
                 throw new UnsupportedOperationException();
             }
@@ -346,11 +346,11 @@ public final class Database implements DataHandler, CastDataProvider {
             systemSession = createSession(systemUser);
             lobSession = createSession(systemUser);
             Set<String> settingKeys = dbSettings.getSettings().keySet();
-            store.getTransactionStore().init(lobSession);
+            store.getTransactionStore().init(lobSession); // 2.初始化 transaction store 
             settingKeys.removeIf(name -> name.startsWith("PAGE_STORE_"));
             CreateTableData data = createSysTableData();
             starting = true;
-            meta = mainSchema.createTable(data);
+            meta = mainSchema.createTable(data); // 3.创建表 mvTable
             IndexColumn[] pkCols = IndexColumn.wrap(new Column[] { data.columns.get(0) });
             metaIdIndex = meta.addIndex(systemSession, "SYS_ID", 0, pkCols, 1,
                     IndexType.createPrimaryKey(false, false), true, null);

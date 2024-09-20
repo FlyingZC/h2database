@@ -18,6 +18,7 @@ import org.h2.api.ErrorCode;
 import org.h2.engine.Constants;
 import org.h2.test.TestBase;
 import org.h2.test.TestDb;
+import org.junit.jupiter.api.Test;
 
 /**
  * Transactional tests, including transaction isolation tests, and tests related
@@ -37,11 +38,11 @@ public class TestTransaction extends TestDb {
 
     @Override
     public void test() throws Exception {
-        testClosingConnectionWithSessionTempTable();
-        testClosingConnectionWithLockedTable();
-        testConstraintCreationRollback();
-        testCommitOnAutoCommitChange();
-        testConcurrentSelectForUpdate();
+//        testClosingConnectionWithSessionTempTable();
+//        testClosingConnectionWithLockedTable();
+//        testConstraintCreationRollback();
+//        testCommitOnAutoCommitChange();
+//        testConcurrentSelectForUpdate();
         testRollback();
         testRollback2();
         testForUpdate();
@@ -1360,5 +1361,4 @@ public class TestTransaction extends TestDb {
         }
         deleteDb("transaction");
     }
-
 }

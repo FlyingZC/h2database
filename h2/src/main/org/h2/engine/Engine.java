@@ -89,7 +89,7 @@ public final class Engine {
                 } else {
                     throwNotFound(ifExists, forbidCreation, name);
                 }
-                database = new Database(ci, cipher);
+                database = new Database(ci, cipher); // 创建 database
                 opened = true;
                 boolean found = false;
                 for (RightOwner rightOwner : database.getAllUsersAndRoles()) {

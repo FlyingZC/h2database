@@ -188,7 +188,7 @@ public abstract class FileStore<C extends Chunk<C>>
 
     private final Queue<WriteBuffer> writeBufferPool = new ArrayBlockingQueue<>(PIPE_LENGTH + 1);
 
-    /**
+    /** layout map。包含所有 map 的块元数据和根位置。  这是元数据变化相对较快的部分
      * The layout map. Contains chunk's metadata and root locations for all maps.
      * This is relatively fast changing part of metadata
      */
@@ -284,12 +284,12 @@ public abstract class FileStore<C extends Chunk<C>>
         chunks.clear();
     }
 
-    public final int getMetaMapId(IntSupplier nextIdSupplier) {
+    public final int getMetaMapId(IntSupplier nextIdSupplier) { // 获取或创建 meta map id
         String metaIdStr = layout.get(META_ID_KEY);
         int metaId;
         if (metaIdStr == null) {
             metaId = nextIdSupplier.getAsInt();
-            layout.put(META_ID_KEY, Integer.toHexString(metaId));
+            layout.put(META_ID_KEY, Integer.toHexString(metaId)); // layout mvMap 缓存 meta id
         } else {
             metaId = DataUtils.parseHexInt(metaIdStr);
         }
@@ -319,13 +319,13 @@ public abstract class FileStore<C extends Chunk<C>>
         return map != layout;
     }
 
-    /**
+    /** 获取指定地图的根页面的“位置”
      * Get "position" of the root page for the specified map
      * @param mapId to get root position for
      * @return opaque "position" value, that should be used to read the page
      */
     public final long getRootPos(int mapId) {
-        String root = layout.get(MVMap.getMapRootKey(mapId));
+        String root = layout.get(MVMap.getMapRootKey(mapId)); // 获取 root key,比如 root.1
         return root == null ? 0 : DataUtils.parseHexLong(root);
     }
 

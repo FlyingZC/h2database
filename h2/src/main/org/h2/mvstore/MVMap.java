@@ -1784,7 +1784,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                             continue;
                         }
                         return result;
-                    case REMOVE: {
+                    case REMOVE: { // remove 操作
                         if (index < 0) {
                             if (!locked && rootReference != getRoot()) {
                                 decisionMaker.reset();

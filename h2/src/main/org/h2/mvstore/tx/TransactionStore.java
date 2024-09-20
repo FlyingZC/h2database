@@ -155,8 +155,8 @@ public class TransactionStore {
         this.dataType = dataType;
         this.timeoutMillis = timeoutMillis;
         this.typeRegistry = openTypeRegistry(store, metaDataType);
-        this.preparedTransactions = store.openMap("openTransactions", new MVMap.Builder<>());
-        this.undoLogBuilder = createUndoLogBuilder();
+        this.preparedTransactions = store.openMap("openTransactions", new MVMap.Builder<>()); // prepared 事务,也是一个 mvMap
+        this.undoLogBuilder = createUndoLogBuilder(); // 创建 undo log, 也是一个 mvMap
     }
 
     @SuppressWarnings({"unchecked","rawtypes"})
@@ -398,7 +398,7 @@ public class TransactionStore {
         do {
             VersionedBitSet original = openTransactions.get();
             if (txId == 0) {
-                transactionId = original.nextClearBit(1); // 获取事务 id(bit set占位)
+                transactionId = original.nextClearBit(1); // 1.获取事务 id(bit set占位)
             } else {
                 transactionId = txId;
                 assert !original.get(transactionId);
@@ -410,22 +410,22 @@ public class TransactionStore {
                         transactionId - 1);
             }
             VersionedBitSet clone = original.clone(); // bit set clone
-            clone.set(transactionId); // 设置 transaction id 到 bit set 指定下标
+            clone.set(transactionId); // 2.设置 transaction id 到 bit set 指定下标
             sequenceNo = clone.getVersion() + 1; // bit set version 自增
             clone.setVersion(sequenceNo); // 设置 version
-            success = openTransactions.compareAndSet(original, clone); // cas 原子更新 openTransactions bit set 对象 
-        } while(!success); // 更新不成功重试
+            success = openTransactions.compareAndSet(original, clone); // 3.cas 原子更新 openTransactions bit set 对象 
+        } while(!success); // 更新不成功,则上面整个流程重试
 
         Transaction transaction = new Transaction(this, transactionId, sequenceNo, status, name, logId,
-                timeoutMillis, ownerId, isolationLevel, listener); // 创建事务对象
+                timeoutMillis, ownerId, isolationLevel, listener); // 4.创建事务对象
 
         assert transactions.get(transactionId) == null;
-        transactions.set(transactionId, transaction); // 设置事务对象到 transactions 数组缓存的指定下标 
+        transactions.set(transactionId, transaction); // 5.设置事务对象到 transactions 数组缓存的指定下标 
 
         if (undoLogs[transactionId] == null) { // 若 undo log 指定位置没有初始化
-            String undoName = getUndoLogName(transactionId); // 根据 transaction id 生成 undo name
-            MVMap<Long,Record<?,?>> undoLog = store.openMap(undoName, undoLogBuilder); // 创建存储 undo log 的 mvMap
-            undoLogs[transactionId] = undoLog; // undo logs 数组 transactionId 下标放入 undoLog 
+            String undoName = getUndoLogName(transactionId); // 6.1.根据 transaction id 生成 undo name
+            MVMap<Long,Record<?,?>> undoLog = store.openMap(undoName, undoLogBuilder); // 6.2.创建存储 undo log 的 mvMap
+            undoLogs[transactionId] = undoLog; // 6.3.undo logs 数组 transactionId 下标放入 undoLog 
         }
         return transaction;
     }

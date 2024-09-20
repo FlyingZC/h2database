@@ -152,7 +152,7 @@ public class MVTable extends TableBase {
         traceLock = database.getTrace(Trace.LOCK);
 
         primaryIndex = new MVPrimaryIndex(database, this, getId(),
-                IndexColumn.wrap(getColumns()), IndexType.createScan(true));
+                IndexColumn.wrap(getColumns()), IndexType.createScan(true)); // 创建 primary index
         indexes.add(primaryIndex);
     }
 

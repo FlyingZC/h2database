@@ -182,7 +182,7 @@ public final class Transaction {
         this.store = store;
         this.transactionId = transactionId;
         this.sequenceNum = sequenceNum;
-        this.statusAndLogId = new AtomicLong(composeState(status, logId, false));
+        this.statusAndLogId = new AtomicLong(composeState(status, logId, false)); // 1. state & log id
         this.name = name;
         setTimeoutMillis(timeoutMillis);
         this.ownerId = ownerId;
@@ -557,28 +557,28 @@ public final class Transaction {
         Throwable ex = null;
         int status = STATUS_OPEN;
         try {
-            long lastState = setStatus(STATUS_ROLLED_BACK);
-            status = getStatus(lastState);
-            long logId = getLogId(lastState);
+            long lastState = setStatus(STATUS_ROLLED_BACK); // 尝试设置事务状态为 ROLLED_BACK，并获取之前的事务状态
+            status = getStatus(lastState); // 根据之前的事务状态获取当前事务状态
+            long logId = getLogId(lastState); // 获取事务的日志 ID
             if (logId > 0) {
-                store.rollbackTo(this, logId, 0);
+                store.rollbackTo(this, logId, 0); // 如果日志 ID 有效，则执行回滚到指定的日志 ID
             }
         } catch (Throwable e) {
-            status = getStatus();
-            if (isActive(status)) {
+            status = getStatus(); // 异常发生时重新获取当前事务状态
+            if (isActive(status)) { // 如果事务仍然处于活动状态，则记录异常并抛出
                 ex = e;
                 throw e;
             }
         } finally {
             try {
-                if (isActive(status)) {
+                if (isActive(status)) { // 如果事务仍然处于活动状态，则结束事务
                     store.endTransaction(this, true);
                 }
             } catch (Throwable e) {
-                if (ex == null) {
+                if (ex == null) { // 如果之前没有捕获异常，则抛出当前异常
                     throw e;
                 } else {
-                    ex.addSuppressed(e);
+                    ex.addSuppressed(e); // 否则，抑制当前异常
                 }
             }
         }

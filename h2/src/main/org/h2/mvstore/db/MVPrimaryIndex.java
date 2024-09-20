@@ -49,14 +49,14 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
         super(table, id, table.getName() + "_DATA", columns, 0, indexType);
         this.mvTable = table;
         RowDataType valueType = table.getRowFactory().getRowDataType();
-        mapName = "table." + getId();
-        Transaction t = mvTable.getTransactionBegin();
+        mapName = "table." + getId(); // 1.mvMap name,比如 table.0
+        Transaction t = mvTable.getTransactionBegin(); // 2.创建 transaction
         dataMap = t.openMap(mapName, LongDataType.INSTANCE, valueType);
         dataMap.map.setVolatile(!table.isPersistData() || !indexType.isPersistent());
         if (!db.isStarting()) {
             dataMap.clear();
         }
-        t.commit();
+        t.commit(); // 3.提交事务
         Long k = dataMap.map.lastKey();    // include uncommitted keys as well
         lastKey.set(k == null ? 0 : k);
     }

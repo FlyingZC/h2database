@@ -85,11 +85,11 @@ public final class Store {
      * @param key for file encryption
      */
     public Store(Database db, byte[] key) {
-        String dbPath = db.getDatabasePath(); // database 存储路径,比如 /home/flyingzc/test
+        String dbPath = db.getDatabasePath(); // 1.database 存储路径,比如 /home/flyingzc/test
         MVStore.Builder builder = new MVStore.Builder();
         boolean encrypted = false;
         if (dbPath != null) {
-            String fileName = dbPath + Constants.SUFFIX_MV_FILE; // /home/flyingzc/test.mv.db
+            String fileName = dbPath + Constants.SUFFIX_MV_FILE; // 2.mv.db文件路径,比如 /home/flyingzc/test.mv.db
             this.fileName = fileName;
             MVStoreTool.compactCleanUp(fileName);
             builder.fileName(fileName);
@@ -130,14 +130,14 @@ public final class Store {
         }
         this.encrypted = encrypted;
         try {
-            this.mvStore = builder.open(); // 创建 mvStore
+            this.mvStore = builder.open(); // 3.创建 mvStore
             if (!db.getSettings().reuseSpace) {
                 mvStore.setReuseSpace(false);
             }
             mvStore.setVersionsToKeep(0);
             this.transactionStore = new TransactionStore(mvStore,
                     new MetaType<>(db, mvStore.backgroundExceptionHandler), new ValueDataType(db, null),
-                    db.getLockTimeout()); // 创建 transaction store
+                    db.getLockTimeout()); // 4.根据 mvStore 创建 transaction store
         } catch (MVStoreException e) {
             throw convertMVStoreException(e);
         }
@@ -213,7 +213,7 @@ public final class Store {
      */
     public MVTable createTable(CreateTableData data) {
         try {
-            MVTable table = new MVTable(data, this);
+            MVTable table = new MVTable(data, this); // 创建 mv table
             tableMap.put(table.getMapName(), table);
             return table;
         } catch (MVStoreException e) {
