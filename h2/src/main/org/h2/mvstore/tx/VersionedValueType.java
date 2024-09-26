@@ -15,7 +15,7 @@ import org.h2.mvstore.type.MetaType;
 import org.h2.mvstore.type.StatefulDataType;
 import org.h2.value.VersionedValue;
 
-/**
+/** 版本化值的值类型。
  * The value type for a versioned value.
  */
 public class VersionedValueType<T,D> extends BasicDataType<VersionedValue<T>> implements StatefulDataType<D> {

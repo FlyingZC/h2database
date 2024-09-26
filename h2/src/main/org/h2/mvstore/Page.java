@@ -20,7 +20,7 @@ import org.h2.util.Utils;
  * A page (a node or a leaf).
  * <p>
  * For b-tree nodes, the key at a given index is larger than the largest key of
- * the child at the same index.
+ * the child at the same index.对于 b 树节点，给定索引处的键大于同一索引处子节点的最大键
  * <p>
  * Serialized format:
  * length of a serialized page in bytes (including this field): int
@@ -36,12 +36,12 @@ import org.h2.util.Utils;
  */
 public abstract class Page<K,V> implements Cloneable {
 
-    /**
+    /** 当前 page 所属的 map
      * Map this page belongs to
      */
     public final MVMap<K,V> map;
 
-    /**
+    /** 此页面保存的图像在 块中的位置
      * Position of this page's saved image within a Chunk
      * or 0 if this page has not been saved yet
      * or 1 if this page has not been saved yet, but already removed
@@ -57,7 +57,7 @@ public abstract class Page<K,V> implements Cloneable {
      */
     private volatile long pos;
 
-    /**
+    /** 块内 页面 的从 0 开始的连续编号
      * Sequential 0-based number of the page within containing chunk.
      */
     public int pageNo = -1;
@@ -142,7 +142,7 @@ public abstract class Page<K,V> implements Cloneable {
         this.keys = keys;
     }
 
-    /**
+    /** 创建一个新的空叶子节点
      * Create a new, empty leaf page.
      *
      * @param <K> key type
@@ -156,7 +156,7 @@ public abstract class Page<K,V> implements Cloneable {
                 map.getValueType().createStorage(0), PAGE_LEAF_MEMORY);
     }
 
-    /**
+    /** 创建一个新的空内部节点
      * Create a new, empty internal node page.
      *
      * @param <K> key type
@@ -171,7 +171,7 @@ public abstract class Page<K,V> implements Cloneable {
                             PAGE_NODE_MEMORY + MEMORY_POINTER + PAGE_MEMORY_CHILD); // there is always one child
     }
 
-    /**
+    /** 创建非叶子节点
      * Create a new non-leaf page. The arrays are not cloned.
      *
      * @param <K> the key class
@@ -221,7 +221,7 @@ public abstract class Page<K,V> implements Cloneable {
         }
     }
 
-    /**
+    /** 获取给定键的值，如果未找到则返回 null。  搜索是在以给定页面为根 的树中完成的。
      * Get the value for the given key, or null if not found.
      * Search is done in the tree rooted at given page.
      *
@@ -234,17 +234,17 @@ public abstract class Page<K,V> implements Cloneable {
      */
     static <K,V> V get(Page<K,V> p, K key) {
         while (true) {
-            int index = p.binarySearch(key);
-            if (p.isLeaf()) {
-                return index >= 0 ? p.getValue(index) : null;
+            int index = p.binarySearch(key); // 二分查找,返回 index
+            if (p.isLeaf()) { // 当前是叶子节点
+                return index >= 0 ? p.getValue(index) : null; // 根据 index 获取从当前 page 里获取 value
             } else if (index++ < 0) {
                 index = -index;
             }
-            p = p.getChildPage(index);
+            p = p.getChildPage(index); // 移动到子节点继续搜索
         }
     }
 
-    /**
+    /** 从 buffer 中读取&创建 page
      * Read a page.
      *
      * @param <K> key type
@@ -256,10 +256,10 @@ public abstract class Page<K,V> implements Cloneable {
      * @return the page
      */
     static <K,V> Page<K,V> read(ByteBuffer buff, long pos, MVMap<K,V> map) {
-        boolean leaf = (DataUtils.getPageType(pos) & 1) == PAGE_TYPE_LEAF;
-        Page<K,V> p = leaf ? new Leaf<>(map) : new NonLeaf<>(map);
-        p.pos = pos;
-        p.read(buff);
+        boolean leaf = (DataUtils.getPageType(pos) & 1) == PAGE_TYPE_LEAF; // 根据指定位置的页面类型判断当前页面是否为叶子节点
+        Page<K,V> p = leaf ? new Leaf<>(map) : new NonLeaf<>(map);  // 创建适当类型的页面实例（叶子节点或非叶子节点）
+        p.pos = pos; // 设置页面的位置
+        p.read(buff);  // 从ByteBuffer中读取序列化的页面信息到页面实例中
         return p;
     }
 
@@ -396,7 +396,7 @@ public abstract class Page<K,V> implements Cloneable {
         return clone;
     }
 
-    /** 在page中二分查找key.若找到key,返回;若未找到key,返回-1
+    /** 在 page 中二分查找 key.若找到 key,返回;若未找到 key,返回-1
      * Search the key in this page using a binary search. Instead of always
      * starting the search in the middle, the last found index is cached.
      * <p>
@@ -408,7 +408,7 @@ public abstract class Page<K,V> implements Cloneable {
      * @return the value or null
      */
     int binarySearch(K key) {
-        int res = map.getKeyType().binarySearch(key, keys, getKeyCount(), cachedCompare);
+        int res = map.getKeyType().binarySearch(key, keys, getKeyCount(), cachedCompare); // 通过 key 进行二分查找
         cachedCompare = res < 0 ? ~res : res + 1; // 更新缓存的比较结果，用于下次优化查找
         return res;
     }
@@ -421,7 +421,7 @@ public abstract class Page<K,V> implements Cloneable {
      */
     abstract Page<K,V> split(int at);
 
-    /**
+    /** 将当前的keys数组分割成两个数组
      * Split the current keys array into two arrays.
      *
      * @param aCount size of the first array.
@@ -540,13 +540,13 @@ public abstract class Page<K,V> implements Cloneable {
      * @param key the key value
      */
     final void insertKey(int index, K key) {
-        int keyCount = getKeyCount(); // 获取 key 数量
+        int keyCount = getKeyCount(); // 1.获取 key 数量
         assert index <= keyCount : index + " > " + keyCount;
-        K[] newKeys = createKeyStorage(keyCount + 1); // 创建新的key存储数组
-        DataUtils.copyWithGap(keys, newKeys, keyCount, index); // 复制原有key到新数组
-        keys = newKeys; // 更新 keys 引用，指向新的 keys
+        K[] newKeys = createKeyStorage(keyCount + 1); // 2.创建新的key存储数组
+        DataUtils.copyWithGap(keys, newKeys, keyCount, index); // 3.复制原有key到新数组
+        keys = newKeys; // 4.更新 keys 引用，指向新的 keys
 
-        keys[index] = key; // 在指定 keys 位置插入 key
+        keys[index] = key; // 5.在指定 keys 位置插入 key
 
         if (isPersistent()) { // is 持久化 
             addMemory(MEMORY_POINTER + map.evaluateMemoryForKey(key)); // 计算插入key的内存开销
@@ -1578,9 +1578,9 @@ public abstract class Page<K,V> implements Cloneable {
         @Override
         public void insertLeaf(int index, K key, V value) { // 在指定位置插入叶子节点,叶子节点存储内容包括 key & value
             int keyCount = getKeyCount();
-            insertKey(index, key); // 插入 key
+            insertKey(index, key); // 1.插入 key
 
-            if(values != null) { // 下面 插入 value
+            if(values != null) { // 2.下面 插入 value
                 V[] newValues = createValueStorage(keyCount + 1); // 创建新数组,原始大小+1,存储value
                 DataUtils.copyWithGap(values, newValues, keyCount, index);
                 values = newValues;

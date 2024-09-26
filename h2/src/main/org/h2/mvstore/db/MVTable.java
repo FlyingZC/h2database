@@ -512,14 +512,14 @@ public class MVTable extends TableBase {
     public void addRow(SessionLocal session, Row row) {
         syncLastModificationIdWithDatabase();
         Transaction t = session.getTransaction();
-        long savepoint = t.setSavepoint();
+        long savepoint = t.setSavepoint(); // 1.获取 savepoint id(undo log id),当插入失败时回滚
         try {
-            for (Index index : indexes) { // 遍历索引
-                index.add(session, row); // 记录添加到索引,注意 mysql/h2 数据就是按照 primary key 索引维护的,所以插入数据的逻辑就在这里
+            for (Index index : indexes) { // 2.遍历索引
+                index.add(session, row); // 3.记录添加到索引,注意 mysql/h2 数据就是按照 primary key 索引维护的,所以插入数据的逻辑就在这里
             }
         } catch (Throwable e) {
             try {
-                t.rollbackToSavepoint(savepoint);
+                t.rollbackToSavepoint(savepoint); // 4.失败回滚
             } catch (Throwable nested) {
                 e.addSuppressed(nested);
             }
@@ -669,12 +669,12 @@ public class MVTable extends TableBase {
     // result in lastModificationId jumping back.
     // This is, of course, unacceptable.
     private void syncLastModificationIdWithDatabase() {
-        long nextModificationDataId = database.getNextModificationDataId();
+        long nextModificationDataId = database.getNextModificationDataId(); // 获取 database 的 next 修改 id
         long currentId;
         do {
             currentId = lastModificationId.get();
         } while (nextModificationDataId > currentId &&
-                !lastModificationId.compareAndSet(currentId, nextModificationDataId));
+                !lastModificationId.compareAndSet(currentId, nextModificationDataId)); // 原子更新 lastModificationId
     }
 
     /**

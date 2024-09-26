@@ -418,7 +418,7 @@ public class JdbcConnection extends TraceObject implements Connection, CastDataP
         return null;
     }
 
-    /**
+    /** 打开或关闭自动提交。启用它会提交一项未提交的事务（如果有）。
      * Switches auto commit on or off. Enabling it commits an uncommitted
      * transaction, if there is one.
      *

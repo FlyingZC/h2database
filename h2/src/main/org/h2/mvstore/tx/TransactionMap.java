@@ -39,7 +39,7 @@ import org.h2.value.VersionedValue;
  */
 public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
-    /**
+    /** 用于写的 map
      * The map used for writing (the latest version).
      * <p>
      * Key: key the key of the data.
@@ -87,7 +87,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
     }
 
-    /**
+    /** 获取给定 transaction 的该映射的克隆
      * Get a clone of this map for the given transaction.
      *
      * @param transaction the transaction
@@ -277,8 +277,8 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
     @Override
     public V putIfAbsent(K key, V value) {
         DataUtils.checkArgument(value != null, "The value may not be null");
-        ifAbsentDecisionMaker.initialize(key, value);
-        V result = set(key, ifAbsentDecisionMaker, -1);
+        ifAbsentDecisionMaker.initialize(key, value); // 1.初始化 decision maker
+        V result = set(key, ifAbsentDecisionMaker, -1); // 2.设置值到 transaction map
         if (ifAbsentDecisionMaker.getDecision() == MVMap.Decision.ABORT) {
             result = ifAbsentDecisionMaker.getLastValue();
         }
@@ -360,7 +360,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
             K k = (K) key;
             // second parameter (value) is not really used,
             // since TxDecisionMaker has it embedded
-            result = map.operate(k, null, decisionMaker);
+            result = map.operate(k, null, decisionMaker); // 1.操作 transaction map,比如插入数据到 transaction map
 
             MVMap.Decision decision = decisionMaker.getDecision();
             assert decision != null;

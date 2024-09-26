@@ -10,12 +10,12 @@ import java.util.Comparator;
 
 import org.h2.mvstore.WriteBuffer;
 
-/**
+/** 数据类型
  * A data type.
  */
 public interface DataType<T> extends Comparator<T> {
 
-    /**
+    /** 比较两个 key
      * Compare two keys.
      *
      * @param a the first key
@@ -26,7 +26,7 @@ public interface DataType<T> extends Comparator<T> {
     @Override
     int compare(T a, T b);
 
-    /**
+    /** 在存储中进行二分查找，返回找到的索引或插入点的负值
      * Perform binary search for the key within the storage
      * @param key to search for
      * @param storage to search within (an array of type T)

@@ -60,8 +60,8 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
     }
 
     void initialize(K key, V value) {
-        this.key = key;
-        this.value = value;
+        this.key = key; // 行的主键
+        this.value = value; // 行
         decision = null;
         reset();
     }
@@ -155,9 +155,9 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
      * @return {@link org.h2.mvstore.MVMap.Decision#PUT}
      */
     MVMap.Decision logAndDecideToPut(VersionedValue<V> valueToLog, V lastValue) {
-        undoKey = transaction.log(new Record<>(mapId, key, valueToLog)); // 记录 undo log
+        undoKey = transaction.log(new Record<>(mapId, key, valueToLog)); // 1.记录 undo log. key 比如是主键 id
         this.lastValue = lastValue;
-        return setDecision(MVMap.Decision.PUT); // put 操作
+        return setDecision(MVMap.Decision.PUT); // 2.put 操作
     }
 
     final MVMap.Decision decideToAbort(V lastValue) {
@@ -255,37 +255,37 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
 
         PutIfAbsentDecisionMaker(int mapId, Transaction transaction, Function<K, V> oldValueSupplier) {
             super(mapId, transaction);
-            this.oldValueSupplier = oldValueSupplier;
+            this.oldValueSupplier = oldValueSupplier; // 提供旧值
         }
 
         @Override
         public MVMap.Decision decide(VersionedValue<V> existingValue, VersionedValue<V> providedValue) {
-            assert getDecision() == null;
+            assert getDecision() == null; // 确保当前决策为空
             int blockingId;
             // if map does not have that entry yet
-            if (existingValue == null) {
-                V snapshotValue = getValueInSnapshot();
-                if (snapshotValue != null) {
+            if (existingValue == null) { // 1.如果 map 中尚无该条目
+                V snapshotValue = getValueInSnapshot(); // 1.1.从快照中获取值
+                if (snapshotValue != null) { // 如果值存在于快照中但不在当前映射中，说明它已被其他事务移除并提交
                     // value exists in a snapshot but not in current map, therefore
                     // it was removed and committed by another transaction
-                    return decideToAbort(snapshotValue);
+                    return decideToAbort(snapshotValue); // 进行 abort
                 }
-                return logAndDecideToPut(null, null); // 记录 undo log & put 操作
+                return logAndDecideToPut(null, null); // 1.2.记录 undo log & put 操作
             } else {
-                long id = existingValue.getOperationId();
+                long id = existingValue.getOperationId(); // 获取现有值的操作ID
                 if (id == 0 // entry is a committed one
                             // or it came from the same transaction
                         || isThisTransaction(blockingId = TransactionStore.getTransactionId(id))) {
                     if(existingValue.getCurrentValue() != null) {
-                        return decideToAbort(existingValue.getCurrentValue());
+                        return decideToAbort(existingValue.getCurrentValue()); // 如果当前值不为空，决定中止
                     }
-                    if (id == 0) {
+                    if (id == 0) { // 如果ID为0，表示可能是条目被移除的情况，检查快照值
                         V snapshotValue = getValueInSnapshot();
-                        if (snapshotValue != null) {
+                        if (snapshotValue != null) { // 如果快照值存在，决定中止
                             return decideToAbort(snapshotValue);
                         }
                     }
-                    return logAndDecideToPut(existingValue, existingValue.getCommittedValue());
+                    return logAndDecideToPut(existingValue, existingValue.getCommittedValue()); // 记录 undo log 并决定放入已提交的值
                 } else if (isCommitted(blockingId)) {
                     // entry belongs to a committing transaction
                     // and therefore will be committed soon
@@ -330,7 +330,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
         }
 
         private V getValueInSnapshot() {
-            return allowNonRepeatableRead() ? null : oldValueSupplier.apply(key);
+            return allowNonRepeatableRead() ? null : oldValueSupplier.apply(key); // 是否允许不可重复读(RC 和以下)
         }
     }
 

@@ -682,10 +682,10 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public void commit(boolean ddl) {
         beforeCommitOrRollback();
-        if (hasTransaction()) {
+        if (hasTransaction()) { // 事务中
             try {
                 markUsedTablesAsUpdated();
-                transaction.commit();
+                transaction.commit(); // 提交事务
                 removeTemporaryLobs(true);
                 endTransaction();
             } finally {
@@ -707,9 +707,9 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
     private void markUsedTablesAsUpdated() {
         // TODO should not rely on locking
         if (!locks.isEmpty()) {
-            for (Table t : locks) {
+            for (Table t : locks) { // 遍历锁
                 if (t instanceof MVTable) {
-                    ((MVTable) t).commit();
+                    ((MVTable) t).commit(); // 提交表,更新 last modify id
                 }
             }
         }
@@ -859,8 +859,8 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      * @return the savepoint
      */
     public Savepoint setSavepoint() {
-        Savepoint sp = new Savepoint(); // 创建 savepoint
-        sp.transactionSavepoint = getStatementSavepoint();
+        Savepoint sp = new Savepoint(); // 1.创建 savepoint
+        sp.transactionSavepoint = getStatementSavepoint(); // 2.获取当前statement对应的savepoint id(undo log id)
         return sp;
     }
 
@@ -1218,7 +1218,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         }
     }
 
-    /**
+    /** 设置该会话的当前命令。这是在执行语句之前完成的。
      * Set the current command of this session. This is done just before
      * executing the statement.
      *
@@ -1226,7 +1226,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     private void setCurrentCommand(Command command) {
         State targetState = command == null ? State.SLEEP : State.RUNNING;
-        transitionToState(targetState, true);
+        transitionToState(targetState, true); // 设置为 running/sleep 状态(执行前running,执行后sleep)
         if (isOpen()) {
             currentCommand = command;
             commandStartOrEnd = Instant.now();
@@ -1245,11 +1245,11 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         }
     }
 
-    private State transitionToState(State targetState, boolean checkSuspended) {
+    private State transitionToState(State targetState, boolean checkSuspended) { // 过渡到目标状态
         State currentState;
         while((currentState = state.get()) != State.CLOSED &&
                 (!checkSuspended || checkSuspended(currentState)) &&
-                !state.compareAndSet(currentState, targetState)) {/**/}
+                !state.compareAndSet(currentState, targetState)) {/**/} // // 使用自旋锁尝试将状态过渡到目标状态，直到成功或对象被关闭
         return currentState;
     }
 
@@ -1446,7 +1446,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public void begin() {
         autoCommitAtTransactionEnd = true;
-        autoCommit = false;
+        autoCommit = false; // 设置 auto commit false
     }
 
     public ValueTimestampTimeZone getSessionStart() {
@@ -1491,27 +1491,27 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         }
     }
 
-    /**
+    /** 如果已为另一个会话启用独占模式，请等待。一旦禁用独占模式，此方法就会返回。
      * Wait if the exclusive mode has been enabled for another session. This
      * method returns as soon as the exclusive mode has been disabled.
      */
     public void waitIfExclusiveModeEnabled() {
-        transitionToState(State.RUNNING, true);
+        transitionToState(State.RUNNING, true); // 尝试将当前会话的状态设置为运行中，并允许在独占模式下运行
         // Even in exclusive mode, we have to let the LOB session proceed, or we
-        // will get deadlocks.
+        // will get deadlocks. 如果当前会话是LOB（大对象）会话，则无需等待，直接返回.这是为了避免死锁，因为LOB会话需要在任何独占模式下都能继续执行
         if (getDatabase().getLobSession() == this) {
             return;
         }
-        while (isOpen()) {
-            SessionLocal exclusive = getDatabase().getExclusiveSession();
-            if (exclusive == null || exclusive == this) {
+        while (isOpen()) { // 当会话处于打开状态时，检查是否存在独占会话
+            SessionLocal exclusive = getDatabase().getExclusiveSession();  // 获取当前数据库的独占会话
+            if (exclusive == null || exclusive == this) { // 如果没有独占会话或当前会话就是独占会话，则退出循环
                 break;
             }
-            if (exclusive.isLockedByCurrentThread()) {
+            if (exclusive.isLockedByCurrentThread()) { // 如果当前线程锁定了独占会话，则说明是在同一连接内使用，直接退出循环
                 // if another connection is used within the connection
                 break;
             }
-            try {
+            try {  // 等待一段时间，然后再次检查独占会话状态
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 // ignore
@@ -1601,7 +1601,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         return objectId++;
     }
 
-    /**
+    /** 获取用于此会话的事务,如果没有会创建并开启
      * Get the transaction to use for this session.
      *
      * @return the transaction
@@ -1614,7 +1614,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                 getDatabase().shutdownImmediately();
                 throw DbException.get(ErrorCode.DATABASE_IS_CLOSED, backgroundException);
             }
-            transaction = store.getTransactionStore().begin(this, this.lockTimeout, id, isolationLevel);
+            transaction = store.getTransactionStore().begin(this, this.lockTimeout, id, isolationLevel); // 开启事务.传入 锁超时时间, session id, 隔离级别
             startStatement = -1;
         }
         return transaction;
@@ -1622,26 +1622,26 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
 
     private long getStatementSavepoint() {
         if (startStatement == -1) {
-            startStatement = getTransaction().setSavepoint();
+            startStatement = getTransaction().setSavepoint(); // 1.获取事务;2.设置savepoint, savepoint id 是 undo log 的当前 log id
         }
         return startStatement;
     }
 
-    /**
+    /** 在事务中开始一个新的语句
      * Start a new statement within a transaction.
      * @param command about to be started
      */
     @SuppressWarnings("incomplete-switch")
     public void startStatementWithinTransaction(Command command) {
-        Transaction transaction = getTransaction();
+        Transaction transaction = getTransaction(); // 1.获取当前事务
         if (transaction != null) {
-            HashSet<MVMap<Object,VersionedValue<Object>>> maps = new HashSet<>();
+            HashSet<MVMap<Object,VersionedValue<Object>>> maps = new HashSet<>(); // 用于存储可能受影响的 MVMap 对象 TODO zc 作用何时不为空
             if (command != null) {
-                Set<DbObject> dependencies = command.getDependencies();
-                switch (transaction.getIsolationLevel()) {
+                Set<DbObject> dependencies = command.getDependencies(); // 获取命令的所有依赖项
+                switch (transaction.getIsolationLevel()) { // 根据事务的隔离级别进行处理
                 case SNAPSHOT:
                 case SERIALIZABLE:
-                    if (!transaction.hasStatementDependencies()) {
+                    if (!transaction.hasStatementDependencies()) { // 如果事务没有语句依赖项，则扫描整个数据库模式和表
                         for (Schema schema : getDatabase().getAllSchemasNoMeta()) {
                             for (Table table : schema.getAllTablesAndViews(null)) {
                                 if (table instanceof MVTable) {
@@ -1654,14 +1654,14 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                     //$FALL-THROUGH$
                 case READ_COMMITTED:
                 case READ_UNCOMMITTED:
-                    for (DbObject dependency : dependencies) {
+                    for (DbObject dependency : dependencies) { // 处理命令的依赖项，主要针对 MVTable 类型的依赖项
                         if (dependency instanceof MVTable) {
                             addTableToDependencies((MVTable)dependency, maps);
                         }
                     }
                     break;
                 case REPEATABLE_READ:
-                    HashSet<MVTable> processed = new HashSet<>();
+                    HashSet<MVTable> processed = new HashSet<>(); // 使用 HashSet 记录已处理的 MVTable，以避免重复处理
                     for (DbObject dependency : dependencies) {
                         if (dependency instanceof MVTable) {
                             addTableToDependencies((MVTable)dependency, maps, processed);
@@ -1670,11 +1670,11 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                     break;
                 }
             }
-            transaction.markStatementStart(maps);
+            transaction.markStatementStart(maps); // 标记语句的开始，并传递可能受影响的 maps
         }
-        startStatement = -1;
+        startStatement = -1; // 重置 startStatement 标志
         if (command != null) {
-            setCurrentCommand(command);
+            setCurrentCommand(command); // 设置当前命令
         }
     }
 
@@ -1803,18 +1803,18 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         }
     }
 
-    /**
+    /** 表示保存点（事务中可以回滚到的位置）。
      * Represents a savepoint (a position in a transaction to where one can roll
      * back to).
      */
     public static class Savepoint {
 
-        /**
+        /** undo log 索引
          * The undo log index.
          */
         int logIndex;
 
-        /**
+        /** savepoint id
          * The transaction savepoint id.
          */
         long transactionSavepoint;

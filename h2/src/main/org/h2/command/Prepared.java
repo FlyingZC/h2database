@@ -122,11 +122,11 @@ public abstract class Prepared {
         if (db == null) {
             throw DbException.get(ErrorCode.CONNECTION_BROKEN_1, "database closed");
         }
-        // parser: currently, compiling every create/drop/... twice
+        // parser: currently, compiling every create/drop/... twice 判断是否需要重新编译的逻辑
         // because needRecompile return true even for the first execution
-        return prepareAlways ||
-                modificationMetaId < db.getModificationMetaId() ||
-                db.getSettings().recompileAlways;
+        return prepareAlways || // 如果每次准备都设置为需要重新编译
+                modificationMetaId < db.getModificationMetaId() || // 本次修改的元数据ID小于数据库的修改元数据ID
+                db.getSettings().recompileAlways; // 数据库设置总是重新编译
     }
 
     /**

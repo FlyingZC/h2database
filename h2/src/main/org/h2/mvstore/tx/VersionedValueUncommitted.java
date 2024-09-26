@@ -7,7 +7,7 @@ package org.h2.mvstore.tx;
 
 import org.h2.value.VersionedValue;
 
-/**
+/** 未提交的版本值
  * Class VersionedValueUncommitted.
  *
  * @author <a href='mailto:andrei.tokar@gmail.com'>Andrei Tokar</a>
@@ -17,10 +17,10 @@ class VersionedValueUncommitted<T> extends VersionedValueCommitted<T> {
     private final T committedValue;
 
     private VersionedValueUncommitted(long operationId, T value, T committedValue) {
-        super(value);
+        super(value); // 当前值
         assert operationId != 0;
         this.operationId = operationId;
-        this.committedValue = committedValue;
+        this.committedValue = committedValue; // 已经提交的值
     }
 
     /**

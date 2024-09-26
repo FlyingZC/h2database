@@ -41,59 +41,59 @@ public final class Delete extends FilteredDataChangeStatement {
     public long update(ResultTarget deltaChangeCollector, ResultOption deltaChangeCollectionMode) {
         targetTableFilter.startQuery(session);
         targetTableFilter.reset();
-        Table table = targetTableFilter.getTable();
-        session.getUser().checkTableRight(table, Right.DELETE);
-        table.fire(session, Trigger.DELETE, true);
-        table.lock(session, Table.WRITE_LOCK);
+        Table table = targetTableFilter.getTable(); // 获取表
+        session.getUser().checkTableRight(table, Right.DELETE); // 校验表权限
+        table.fire(session, Trigger.DELETE, true);  // 触发删除前的表级触发器
+        table.lock(session, Table.WRITE_LOCK);  // 加锁表
         long limitRows = -1;
-        if (fetchExpr != null) {
+        if (fetchExpr != null) { // 如果有fetch表达式，获取fetch的值
             Value v = fetchExpr.getValue(session);
             if (v == ValueNull.INSTANCE || (limitRows = v.getLong()) < 0) {
                 throw DbException.getInvalidValueException("FETCH", v);
             }
         }
-        try (LocalResult rows = LocalResult.forTable(session, table)) {
+        try (LocalResult rows = LocalResult.forTable(session, table)) { // 处理表数据
             setCurrentRowNumber(0);
             long count = 0;
-            while (nextRow(limitRows, count)) {
+            while (nextRow(limitRows, count)) { // 遍历数据行
                 Row row = targetTableFilter.get();
-                if (table.isRowLockable()) {
+                if (table.isRowLockable()) { // 如果表支持行级锁，尝试加锁行
                     Row lockedRow = table.lockRow(session, row, -1);
                     if (lockedRow == null) {
                         continue;
                     }
-                    if (!row.hasSharedData(lockedRow)) {
+                    if (!row.hasSharedData(lockedRow)) { // 如果锁定的行和原始行共享数据，使用锁定的行替换原始行
                         row = lockedRow;
                         targetTableFilter.set(row);
-                        if (condition != null && !condition.getBooleanValue(session)) {
+                        if (condition != null && !condition.getBooleanValue(session)) { // 如果有条件表达式且不满足，跳过当前行
                             continue;
                         }
                     }
                 }
-                if (deltaChangeCollectionMode == ResultOption.OLD) {
+                if (deltaChangeCollectionMode == ResultOption.OLD) { // 根据收集模式，将旧数据添加到收集器
                     deltaChangeCollector.addRow(row.getValueList());
                 }
-                if (!table.fireRow() || !table.fireBeforeRow(session, row, null)) {
+                if (!table.fireRow() || !table.fireBeforeRow(session, row, null)) { // 如果满足触发器条件，添加行到结果集中
                     rows.addRowForTable(row);
                 }
                 count++;
             }
             rows.done();
             long rowScanCount = 0;
-            while (rows.next()) {
+            while (rows.next()) { // 删除行
                 if ((++rowScanCount & 127) == 0) {
                     checkCanceled();
                 }
                 Row row = rows.currentRowForTable();
                 table.removeRow(session, row);
             }
-            if (table.fireRow()) {
+            if (table.fireRow()) { // 触发删除后的表级触发器
                 for (rows.reset(); rows.next();) {
                     table.fireAfterRow(session, rows.currentRowForTable(), null, false);
                 }
             }
             table.fire(session, Trigger.DELETE, false);
-            return count;
+            return count; // 返回更新的行数
         }
     }
 

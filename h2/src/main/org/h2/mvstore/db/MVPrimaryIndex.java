@@ -51,7 +51,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
         RowDataType valueType = table.getRowFactory().getRowDataType();
         mapName = "table." + getId(); // 1.mvMap name,比如 table.0
         Transaction t = mvTable.getTransactionBegin(); // 2.创建 transaction
-        dataMap = t.openMap(mapName, LongDataType.INSTANCE, valueType);
+        dataMap = t.openMap(mapName, LongDataType.INSTANCE, valueType); // 3.创建 transaction map
         dataMap.map.setVolatile(!table.isPersistData() || !indexType.isPersistent());
         if (!db.isStarting()) {
             dataMap.clear();
@@ -86,7 +86,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
 
     @Override
     public void add(SessionLocal session, Row row) { // 添加行到主键索引
-        if (mainIndexColumn == SearchRow.ROWID_INDEX) { // 为没有显式主键的行生成主键值
+        if (mainIndexColumn == SearchRow.ROWID_INDEX) { // 1.为没有显式主键的行生成主键值
             if (row.getKey() == 0) {
                 row.setKey(lastKey.incrementAndGet());
             }
@@ -108,10 +108,10 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
             }
         }
 
-        TransactionMap<Long,SearchRow> map = getMap(session);
-        long rowKey = row.getKey();
+        TransactionMap<Long,SearchRow> map = getMap(session); // 2.获取 transaction map
+        long rowKey = row.getKey(); // 行的主键
         try {
-            Row old = (Row)map.putIfAbsent(rowKey, row);
+            Row old = (Row)map.putIfAbsent(rowKey, row); // 3.插入 row 到 transaction map!!!
             if (old != null) {
                 int errorCode = ErrorCode.CONCURRENT_UPDATE_1;
                 if (map.getImmediate(rowKey) != null || map.getFromSnapshot(rowKey) != null) {
@@ -447,8 +447,8 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
         if (session == null) {
             return dataMap;
         }
-        Transaction t = session.getTransaction();
-        return dataMap.getInstance(t);
+        Transaction t = session.getTransaction(); // 获取事务
+        return dataMap.getInstance(t); // 获取事务对应的 transaction map
     }
 
     @Override

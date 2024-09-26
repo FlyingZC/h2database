@@ -199,7 +199,7 @@ public final class MVStore implements AutoCloseable {
 
     private volatile long currentVersion;
 
-    /**
+    /** 使用的最旧的商店版本。所有超出此版本的版本都可以安全删除
      * Oldest store version in use. All version beyond this can be safely dropped
      */
     private final AtomicLong oldestVersionToKeep = new AtomicLong();

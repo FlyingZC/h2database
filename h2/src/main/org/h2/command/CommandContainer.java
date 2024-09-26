@@ -136,7 +136,7 @@ public class CommandContainer extends Command {
                 result = new ResultWithGeneratedKeys.WithKeys(prepared.update(), new LocalResult());
             }
         } else {
-            result = ResultWithGeneratedKeys.of(prepared.update());
+            result = ResultWithGeneratedKeys.of(prepared.update()); // 执行 update
         }
         prepared.trace(database, startTimeNanos, result.getUpdateCount());
         setProgress(database, DatabaseEventListener.STATE_STATEMENT_END);

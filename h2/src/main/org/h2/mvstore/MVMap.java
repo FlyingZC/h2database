@@ -622,7 +622,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         return singleWriter;
     }
 
-    /**
+    /** 通过 mvStore 从磁盘读取 page 到内存 
      * Read a page.
      *
      * @param pos the position of the page
@@ -1377,21 +1377,21 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
     public void append(K key, V value) {
         if (singleWriter) {
             beforeWrite();
-            RootReference<K,V> rootReference = lockRoot(getRoot(), 1); // 锁定根节点
-            int appendCounter = rootReference.getAppendCounter(); // 获取写入下标
+            RootReference<K,V> rootReference = lockRoot(getRoot(), 1); // 1.锁定根节点
+            int appendCounter = rootReference.getAppendCounter(); // 2.获取当前写入下标
             try {
-                if (appendCounter >= keysPerPage) { // 数量超出则 flush buffer
+                if (appendCounter >= keysPerPage) { // 3.数量超出则 flush buffer
                     rootReference = flushAppendBuffer(rootReference, false);
                     appendCounter = rootReference.getAppendCounter();
                     assert appendCounter < keysPerPage;
                 }
-                keysBuffer[appendCounter] = key; // key 写入 buffer
+                keysBuffer[appendCounter] = key; // 4.key 写入 buffer
                 if (valuesBuffer != null) {
-                    valuesBuffer[appendCounter] = value; // value 写入 buffer
+                    valuesBuffer[appendCounter] = value; // 5.value 写入 buffer
                 }
-                ++appendCounter; // 下标递增
+                ++appendCounter; // 3. append counter 下标递增
             } finally {
-                unlockRoot(appendCounter); // 解锁 root
+                unlockRoot(appendCounter); // 4.解锁 root
             }
         } else {
             put(key, value);
@@ -1763,16 +1763,16 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
             V result;
             unsavedMemoryHolder.value = 0;
             try {
-                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 2.从根节点开始，根据key遍历tree,找到key的位置
+                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 2.从根节点开始，根据 key 遍历 tree,找到 key 的位置 pos
                 if (!locked && rootReference != getRoot()) {
                     continue;
                 }
-                Page<K,V> p = pos.page;
+                Page<K,V> p = pos.page; // 3.获取插入位置对应的 pos
                 int index = pos.index;
                 tip = pos;
                 pos = pos.parent;
-                result = index < 0 ? null : p.getValue(index); // 根据索引获取值,如果是插入操作此处为null,因为原来没有值
-                Decision decision = decisionMaker.decide(result, value, tip); // 根据 当前值、目标值 和 游标位置 决定操作类型
+                result = index < 0 ? null : p.getValue(index); // 4.根据索引获取 page 上的值,如果是插入操作此处为 null,因为原来没有值
+                Decision decision = decisionMaker.decide(result, value, tip); // 5.根据 当前值、目标值 和 游标位置 决定操作类型
 
                 switch (decision) {
                     case REPEAT:

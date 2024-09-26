@@ -43,7 +43,7 @@ public class TransactionCommand extends Prepared {
             session.begin();
             break;
         case CommandInterface.COMMIT:
-            session.commit(false);
+            session.commit(false); // 提交操作
             break;
         case CommandInterface.ROLLBACK:
             session.rollback();

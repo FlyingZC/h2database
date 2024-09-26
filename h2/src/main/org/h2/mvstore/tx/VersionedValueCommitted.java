@@ -7,13 +7,13 @@ package org.h2.mvstore.tx;
 
 import org.h2.value.VersionedValue;
 
-/**
+/** 已经提交的版本值
  * Class CommittedVersionedValue.
  *
  * @author <a href='mailto:andrei.tokar@gmail.com'>Andrei Tokar</a>
  */
 class VersionedValueCommitted<T> extends VersionedValue<T> {
-    /**
+    /** 当前值
      * The current value.
      */
     public final T value;

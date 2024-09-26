@@ -13,7 +13,7 @@ import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.BasicDataType;
 import org.h2.value.VersionedValue;
 
-/** undoLog里的值.包含 map 的变更
+/** undoLog 里的值.包含 map 的变更
  * Class Record is a value for undoLog.
  * It contains information about a single change of some map.
  *
@@ -34,7 +34,7 @@ final class Record<K,V> {
      */
     final K key;
 
-    /** 变更前的 value.
+    /** 变更前的 value.undo log 是用于回滚的,所以会记录旧值
      * Value of the entry before change.
      * It is null if entry did not exist before the change (addition).
      */

@@ -293,15 +293,15 @@ public abstract class Command implements CommandInterface {
         boolean callStop = true;
         Database database = getDatabase();
         commitIfNonTransactional();
-        SessionLocal.Savepoint rollback = session.setSavepoint(); // 创建 savepoint
-        session.startStatementWithinTransaction(this);
+        SessionLocal.Savepoint rollback = session.setSavepoint(); // 1.创建 or 获取事务; 2.创建 savepoint
+        session.startStatementWithinTransaction(this); // 2.事务内 start statement
         DbException ex = null;
         Session oldSession = session.setThreadLocalSession();
         try {
             while (true) {
                 database.checkPowerOff();
                 try {
-                    return update(generatedKeysRequest);
+                    return update(generatedKeysRequest); // 3.执行语句
                 } catch (DbException e) {
                     // cannot retry some commands
                     if (!isRetryable()) {
@@ -355,7 +355,7 @@ public abstract class Command implements CommandInterface {
     }
 
     private void commitIfNonTransactional() {
-        if (!isTransactional()) {
+        if (!isTransactional()) { // 默认 is transactional 是 true 不会走这里
             boolean autoCommit = session.getAutoCommit();
             session.commit(true);
             if (!autoCommit && session.getAutoCommit()) {

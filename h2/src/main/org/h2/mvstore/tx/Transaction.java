@@ -70,7 +70,7 @@ public final class Transaction {
     private static final String[] STATUS_NAMES = {
             "CLOSED", "OPEN", "PREPARED", "COMMITTED", "ROLLING_BACK", "ROLLED_BACK"
     };
-    /**
+    /** 我们在事务中存储的“操作id”中有多少位属于日志id（其余的属于事务id）。
      * How many bits of the "operation id" we store in the transaction belong to the
      * log id (the rest belong to the transaction id).
      */
@@ -182,7 +182,7 @@ public final class Transaction {
         this.store = store;
         this.transactionId = transactionId;
         this.sequenceNum = sequenceNum;
-        this.statusAndLogId = new AtomicLong(composeState(status, logId, false)); // 1. state & log id
+        this.statusAndLogId = new AtomicLong(composeState(status, logId, false)); // 1. 创建 transaction status & log id
         this.name = name;
         setTimeoutMillis(timeoutMillis);
         this.ownerId = ownerId;
@@ -217,7 +217,7 @@ public final class Transaction {
             long logId = getLogId(currentState);
             int currentStatus = getStatus(currentState);
             boolean valid;
-            switch (status) {
+            switch (status) { // 判断当前状态允许变更为目标状态,然后变更为目标状态
                 case STATUS_ROLLING_BACK:
                     valid = currentStatus == STATUS_OPEN;
                     break;
@@ -251,8 +251,8 @@ public final class Transaction {
                         "Transaction was illegally transitioned from {0} to {1}",
                         getStatusName(currentStatus), getStatusName(status));
             }
-            long newState = composeState(status, logId, hasRollback(currentState));
-            if (statusAndLogId.compareAndSet(currentState, newState)) {
+            long newState = composeState(status, logId, hasRollback(currentState)); // 2.新状态
+            if (statusAndLogId.compareAndSet(currentState, newState)) { // 3.原子变更
                 return currentState;
             }
         }
@@ -282,7 +282,7 @@ public final class Transaction {
         return blocker == null ? 0 : blocker.ownerId;
     }
 
-    /**
+    /** 创建 savepoint, 返回 undo log id
      * Create a new savepoint.
      *
      * @return the savepoint id
@@ -330,18 +330,18 @@ public final class Transaction {
     @SuppressWarnings({"unchecked","rawtypes"})
     public void markStatementStart(HashSet<MVMap<Object,VersionedValue<Object>>> maps) {
         markStatementEnd();
-        if (txCounter == null && store.store.isVersioningRequired()) {
-            txCounter = store.store.registerVersionUsage();
+        if (txCounter == null && store.store.isVersioningRequired()) { // 需要版本控制
+            txCounter = store.store.registerVersionUsage(); // 注册版本使用
         }
 
-        if (maps != null && !maps.isEmpty()) {
+        if (maps != null && !maps.isEmpty()) { // 关联的 mvMap 不为空
             // The purpose of the following loop is to get a coherent picture
             // In order to get such a "snapshot", we wait for a moment of silence,
             // when no new transaction were committed / closed.
             BitSet committingTransactions;
             do {
                 committingTransactions = store.committingTransactions.get();
-                for (MVMap<Object,VersionedValue<Object>> map : maps) {
+                for (MVMap<Object,VersionedValue<Object>> map : maps) { // 为每个 mvMap 创建快照
                     TransactionMap<?,?> txMap = openMapX(map);
                     txMap.setStatementSnapshot(new Snapshot(map.flushAndGetRoot(), committingTransactions));
                 }
@@ -397,17 +397,17 @@ public final class Transaction {
      * @return key for the newly added undo log entry
      */
     long log(Record<?,?> logRecord) {
-        long currentState = statusAndLogId.getAndIncrement(); // status&logId 递增
-        long logId = getLogId(currentState); // 获取 logId
+        long currentState = statusAndLogId.getAndIncrement(); // 1.status&logId 递增
+        long logId = getLogId(currentState); // 2.获取 logId
         if (logId >= LOG_ID_LIMIT) {
             throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TRANSACTION_TOO_BIG,
                     "Transaction {0} has too many changes",
                     transactionId);
         }
-        int currentStatus = getStatus(currentState); // 获取 state
-        checkOpen(currentStatus); // 校验状态应该是 open
-        long undoKey = store.addUndoLogRecord(transactionId, logId, logRecord); // undo log 添加到存储
+        int currentStatus = getStatus(currentState); // 3.获取 state
+        checkOpen(currentStatus); // 4.校验状态应该是 open
+        long undoKey = store.addUndoLogRecord(transactionId, logId, logRecord); // 5.undo log 添加到存储
         return undoKey;
     }
 
@@ -457,7 +457,7 @@ public final class Transaction {
         return openMapX(map);
     }
 
-    /** 打开给定map的事务版本
+    /** 打开/创建给定 map 的事务版本
      * Open the transactional version of the given map.
      *
      * @param <K> the key type
@@ -471,7 +471,7 @@ public final class Transaction {
         int id = map.getId();
         TransactionMap<K,V> transactionMap = (TransactionMap<K,V>)transactionMaps.get(id); // transaction 缓存
         if (transactionMap == null) {
-            transactionMap = new TransactionMap<>(this, map);
+            transactionMap = new TransactionMap<>(this, map); // 创建 transaction map
             transactionMaps.put(id, transactionMap);
         }
         return transactionMap;
@@ -490,17 +490,17 @@ public final class Transaction {
      * Commit the transaction. Afterwards, this transaction is closed.
      */
     public void commit() {
-        assert store.openTransactions.get().get(transactionId);
-        markTransactionEnd();
+        assert store.openTransactions.get().get(transactionId); // 确认当前事务是打开状态
+        markTransactionEnd(); // 1.标记事务结束
         Throwable ex = null;
         boolean hasChanges = false;
         int previousStatus = STATUS_OPEN;
         try {
-            long state = setStatus(STATUS_COMMITTED);
-            hasChanges = hasChanges(state);
-            previousStatus = getStatus(state);
+            long state = setStatus(STATUS_COMMITTED); // 2.设置状态为 已提交
+            hasChanges = hasChanges(state); // 3.判断是否有更改
+            previousStatus = getStatus(state); // 获取上一个状态
             if (hasChanges) {
-                store.commit(this, previousStatus == STATUS_COMMITTED);
+                store.commit(this, previousStatus == STATUS_COMMITTED); // 4.如果有更改，执行提交操作
             }
         } catch (Throwable e) {
             ex = e;
