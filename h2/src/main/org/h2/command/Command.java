@@ -290,7 +290,7 @@ public abstract class Command implements CommandInterface {
 
     private ResultWithGeneratedKeys executeUpdate(Object generatedKeysRequest, boolean commitIfAutoCommit) {
         long start = 0;
-        boolean callStop = true;
+         boolean callStop = true;
         Database database = getDatabase();
         commitIfNonTransactional();
         SessionLocal.Savepoint rollback = session.setSavepoint(); // 1.创建 or 获取事务; 2.创建 savepoint

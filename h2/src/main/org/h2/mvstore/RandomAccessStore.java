@@ -597,8 +597,8 @@ public abstract class RandomAccessStore extends FileStore<SFChunk>
             storeHeader.put(HDR_VERSION, lastChunk.version);
         }
         DataUtils.appendMap(buff, storeHeader);
-        byte[] bytes = buff.toString().getBytes(StandardCharsets.ISO_8859_1);
-        int checksum = DataUtils.getFletcher32(bytes, 0, bytes.length);
+        byte[] bytes = buff.toString().getBytes(StandardCharsets.ISO_8859_1); // 将字符串转成字节数组
+        int checksum = DataUtils.getFletcher32(bytes, 0, bytes.length); // 计算校验和
         DataUtils.appendMap(buff, HDR_FLETCHER, checksum);
         buff.append('\n');
         bytes = buff.toString().getBytes(StandardCharsets.ISO_8859_1);

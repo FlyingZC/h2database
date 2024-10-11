@@ -16,7 +16,7 @@ import org.h2.value.VersionedValue;
  * @author <a href='mailto:andrei.tokar@gmail.com'>Andrei Tokar</a>
  */
 final class CommitDecisionMaker<V> extends MVMap.DecisionMaker<VersionedValue<V>> {
-    private long undoKey;
+    private long undoKey; // btree 上的 undoLogKey (operation id)
     private MVMap.Decision decision;
 
     void setUndoKey(long undoKey) {
@@ -50,7 +50,7 @@ final class CommitDecisionMaker<V> extends MVMap.DecisionMaker<VersionedValue<V>
     public <T extends VersionedValue<V>> T selectValue(T existingValue, T providedValue) {
         assert decision == MVMap.Decision.PUT;
         assert existingValue != null;
-        return (T) VersionedValueCommitted.getInstance(existingValue.getCurrentValue());
+        return (T) VersionedValueCommitted.getInstance(existingValue.getCurrentValue()); // 获取当前值
     }
 
     @Override

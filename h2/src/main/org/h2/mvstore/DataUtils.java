@@ -407,7 +407,7 @@ public final class DataUtils {
         }
     }
 
-    /**
+    /** 复制数组的元素，并删除 removeIndex 下标对应的一个元素。
      * Copy the elements of an array, and remove one element.
      *
      * @param src the source array

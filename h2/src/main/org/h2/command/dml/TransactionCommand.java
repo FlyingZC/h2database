@@ -46,7 +46,7 @@ public class TransactionCommand extends Prepared {
             session.commit(false); // 提交操作
             break;
         case CommandInterface.ROLLBACK:
-            session.rollback();
+            session.rollback(); // 回滚操作
             break;
         case CommandInterface.CHECKPOINT:
             session.getUser().checkAdmin();

@@ -149,7 +149,7 @@ public final class MVStore implements AutoCloseable {
     static final long INITIAL_VERSION = -1;
 
 
-    /**
+    /** 控制对主要存储操作的访问的锁：store()、close()...它可以替代synchronized(this)，但它允许非阻塞锁定尝试。
      * Lock which governs access to major store operations: store(), close(), ...
      * It serves as a replacement for synchronized(this), except it allows for
      * non-blocking lock attempts.
@@ -197,7 +197,7 @@ public final class MVStore implements AutoCloseable {
 
     public final UncaughtExceptionHandler backgroundExceptionHandler;
 
-    private volatile long currentVersion;
+    private volatile long currentVersion; // 当前版本号(last chunk version).
 
     /** 使用的最旧的商店版本。所有超出此版本的版本都可以安全删除
      * Oldest store version in use. All version beyond this can be safely dropped
@@ -285,7 +285,7 @@ public final class MVStore implements AutoCloseable {
                     boolean readOnly = config.containsKey("readOnly");
                     fileStore.open(fileName, readOnly, encryptionKey); // 2.打开文件存储
                 }
-                fileStore.bind(this); // 3.绑定文件存储到当前 mvStore 实例
+                fileStore.bind(this); // 3.绑定文件存储到当前 mvStore 实例(创建 layout mvMap)
                 metaMap = fileStore.start(); // 4.启动文件存储，返回 MVMap (meta map)
             } catch (MVStoreException e) {
                 panic(e);
@@ -311,7 +311,7 @@ public final class MVStore implements AutoCloseable {
     }
 
     public MVMap<String,String> openMetaMap() {
-        int metaId = fileStore != null ? fileStore.getMetaMapId(this::getNextMapId) : 1; // 获取 meta map id
+        int metaId = fileStore != null ? fileStore.getMetaMapId(this::getNextMapId) : 1; // 1.获取 meta map id
         MVMap<String,String> map = new MVMap<>(this, metaId, StringDataType.INSTANCE, StringDataType.INSTANCE);
         map.setRootPos(getRootPos(map.getId()), currentVersion);
         return map;
@@ -391,7 +391,7 @@ public final class MVStore implements AutoCloseable {
         return new MVStore(config);
     }
 
-    /**
+    /** 打开 mvMap.如果不存在自动创建,如果存在则返回该 mvMap
      * Open a map with the default settings. The map is automatically create if
      * it does not yet exist. If a map with this name is already open, this map
      * is returned.
@@ -429,7 +429,7 @@ public final class MVStore implements AutoCloseable {
             assert builder.getValueType() == null
                     || map.getValueType().getClass().equals(builder.getValueType().getClass());
             return map;
-        } else {
+        } else { // 若不存在, 则创建一个新 map
             HashMap<String, Object> c = new HashMap<>();
             id = getNextMapId(); // 2.获取新分配的 map id
             assert getMap(id) == null;
@@ -485,7 +485,7 @@ public final class MVStore implements AutoCloseable {
         return map;
     }
 
-    /**
+    /** 根据 id 获取 mvMap
      * Get map by id.
      *
      * @param <K> the key type
@@ -1374,7 +1374,7 @@ public final class MVStore implements AutoCloseable {
     }
 
     private long getRootPos(int mapId) {
-        return fileStore == null ? 0 : fileStore.getRootPos(mapId);
+        return fileStore == null ? 0 : fileStore.getRootPos(mapId); // 从文件存储中获取 map id 对应的 root pos
     }
 
     /**
@@ -1679,7 +1679,7 @@ public final class MVStore implements AutoCloseable {
         }
     }
 
-    /**
+    /** 减少版本计数器
      * De-register (close) completed operation (transaction).
      * This will decrement usage counter for the corresponding version.
      * If counter reaches zero, that version (and all unused after it)

@@ -251,7 +251,7 @@ public class TransactionStore {
     }
 
     private void markUndoLogAsCommitted(int transactionId) {
-        addUndoLogRecord(transactionId, LOG_ID_MASK, Record.COMMIT_MARKER); // 追加标记 undo log 为 committed(不会修改之前的)
+        addUndoLogRecord(transactionId, LOG_ID_MASK, Record.COMMIT_MARKER); // 追加标记 undo log 为 committed(添加到 undo log mvMap,不会修改之前的)
     }
 
     /** 提交所有处于已提交状态的事务，并回滚所有非 prepared 的事务。
@@ -297,10 +297,10 @@ public class TransactionStore {
         return store.hasMap(name);
     }
 
-    private static final int LOG_ID_BITS = Transaction.LOG_ID_BITS;
+    private static final int LOG_ID_BITS = Transaction.LOG_ID_BITS; // log id 位数
     private static final long LOG_ID_MASK = (1L << LOG_ID_BITS) - 1;
 
-    /** 事务id 和 log id 计算 operation id
+    /** 事务id 和 log id 计算 operation id. (operation id = transaction id + undo log id)
      * Combine the transaction id and the log id to an operation id.
      *
      * @param transactionId the transaction id
@@ -312,7 +312,7 @@ public class TransactionStore {
                 "Transaction id out of range: {0}", transactionId);
         DataUtils.checkArgument(logId >= 0 && logId <= LOG_ID_MASK,
                 "Transaction log id out of range: {0}", logId);
-        return ((long) transactionId << LOG_ID_BITS) | logId;
+        return ((long) transactionId << LOG_ID_BITS) | logId; // transactionId + logId. 将 transactionId 左移 LOG_ID_BITS 位，并与 logId 按位或运算，生成 operationId
     }
 
     /**
@@ -453,8 +453,8 @@ public class TransactionStore {
      * @return key for the added record
      */
     long addUndoLogRecord(int transactionId, long logId, Record<?,?> record) {
-        MVMap<Long, Record<?,?>> undoLog = undoLogs[transactionId]; // 1.获取指定事务对应的 undo log 映射
-        long undoKey = getOperationId(transactionId, logId); // 计算得到 undo log key
+        MVMap<Long, Record<?,?>> undoLog = undoLogs[transactionId]; // 1.获取指定事务对应的 undo log mvMap
+        long undoKey = getOperationId(transactionId, logId); // 2.计算得到 undo log key(transaction id + undo log id),也就是 undoLog mvMap 上节点的 key
         if (logId == 0 && !undoLog.isEmpty()) {
             throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TOO_MANY_OPEN_TRANSACTIONS,
@@ -462,7 +462,7 @@ public class TransactionStore {
                     "is still open: {0}",
                     transactionId);
         }
-        undoLog.append(undoKey, record); // 追加 undo log mvMap(将 key:undoLogKey, value:undoLogRecord 添加到 map 里)
+        undoLog.append(undoKey, record); // 3.追加 undo log mvMap(将 key:undoLogKey, value:undoLogRecord 添加到 map 里)
         return undoKey;
     }
 
@@ -501,32 +501,32 @@ public class TransactionStore {
                 removeUndoLogRecord(transactionId);
                 cursor = undoLog.cursor(null);
             } else {
-                cursor = undoLog.cursor(null);
-                markUndoLogAsCommitted(transactionId); // 1.2.标记 undo log 提交
+                cursor = undoLog.cursor(null); // 获取 undo log mvMap 的 cursor
+                markUndoLogAsCommitted(transactionId); // 1.2.标记 undo log 已提交
             }
 
             // this is an atomic action that causes all changes
             // made by this transaction, to be considered as "committed"
-            flipCommittingTransactionsBit(transactionId, true);  // 2.标记所有事务更改为“已提交”的原子操作
+            flipCommittingTransactionsBit(transactionId, true);  // 2.标记事务更改为“已提交”的原子操作(修改 committingTransactions)
 
-            CommitDecisionMaker<Object> commitDecisionMaker = new CommitDecisionMaker<>();
+            CommitDecisionMaker<Object> commitDecisionMaker = new CommitDecisionMaker<>(); // 事务提交决定
             try {
-                while (cursor.hasNext()) { // 3.遍历当前事务对应的 undo log
+                while (cursor.hasNext()) { // 3.遍历当前事务对应的 undoLog mvMap 里的所有 undo log key
                     Long undoKey = cursor.next(); // 获取 undo log key
                     Record<?,?> op = cursor.getValue(); // 获取 undo log record
                     int mapId = op.mapId; // 4.undo log 操作涉及的 map id
                     MVMap<Object, VersionedValue<Object>> map = openMap(mapId); // 5.打开 mvMap(当前事务的当前 undo log 操作对应的行数据map)
                     if (map != null && !map.isClosed()) { // might be null if map was removed later
-                        Object key = op.key; // 当前 undo log 操作的 key(比如行主键id)
+                        Object key = op.key; // 当前 undo log 操作的 key(undoLogRecord.key, 比如行主键id)
                         commitDecisionMaker.setUndoKey(undoKey);
                         // second parameter (value) is not really
                         // used by CommitDecisionMaker
-                        map.operate(key, null, commitDecisionMaker); // 根据 key 操作 map
+                        map.operate(key, null, commitDecisionMaker); // 根据 key 操作 map(将事务修改的数据应用到btree上)
                     }
                 }
             } finally {
                 try {
-                    undoLog.clear(); // 4.清理 undo log
+                    undoLog.clear(); // 4.清理 undo log mvMap(更新 root 为 empty.可以 debug 查看进入这个方法前后 undoLog 对象的变化)
                 } finally {
                     flipCommittingTransactionsBit(transactionId, false); // 5.重置 transactionId 状态位为 未提交
                 }
@@ -565,7 +565,7 @@ public class TransactionStore {
                                             .keyType(keyType).valueType(valueType));
     }
 
-    /**
+    /** 打开具有给定 ID 的地图。
      * Open the map with the given id.
      *
      * @param <K> key type
@@ -575,7 +575,7 @@ public class TransactionStore {
      * @return the map
      */
     <K,V> MVMap<K, VersionedValue<V>> openMap(int mapId) {
-        MVMap<K, VersionedValue<V>> map = store.getMap(mapId);
+        MVMap<K, VersionedValue<V>> map = store.getMap(mapId); // 根据 map id 获取 mvMap
         if (map == null) {
             String mapName = store.getMapName(mapId);
             if (mapName == null) {
@@ -611,10 +611,10 @@ public class TransactionStore {
     void endTransaction(Transaction t, boolean hasChanges) {
         t.closeIt();
         int txId = t.transactionId;
-        transactions.set(txId, null);
+        transactions.set(txId, null); // 清理 transactions
 
         boolean success;
-        do {
+        do { // 清理 openTransactions
             VersionedBitSet original = openTransactions.get();
             assert original.get(txId);
             VersionedBitSet clone = original.clone();
@@ -710,7 +710,7 @@ public class TransactionStore {
         return transactions.get(transactionId);
     }
 
-    /**
+    /** 回滚到旧的保存点
      * Rollback to an old savepoint.
      *
      * @param t the transaction
@@ -719,11 +719,11 @@ public class TransactionStore {
      */
     void rollbackTo(Transaction t, long maxLogId, long toLogId) {
         int transactionId = t.getId();
-        MVMap<Long,Record<?,?>> undoLog = undoLogs[transactionId];
-        RollbackDecisionMaker decisionMaker = new RollbackDecisionMaker(this, transactionId, toLogId, t.listener);
-        for (long logId = maxLogId - 1; logId >= toLogId; logId--) {
-            Long undoKey = getOperationId(transactionId, logId);
-            undoLog.operate(undoKey, null, decisionMaker);
+        MVMap<Long,Record<?,?>> undoLog = undoLogs[transactionId]; // 1.获取 transaction id 对应的 undo log
+        RollbackDecisionMaker decisionMaker = new RollbackDecisionMaker(this, transactionId, toLogId, t.listener); // 2.rollback decision maker
+        for (long logId = maxLogId - 1; logId >= toLogId; logId--) { // 3.遍历从 maxLogId 到 toLogId
+            Long undoKey = getOperationId(transactionId, logId); // 3.1.计算 undo log key
+            undoLog.operate(undoKey, null, decisionMaker); // 3.2.操作 undo log mvMap, 执行回滚操作
             decisionMaker.reset();
         }
     }
@@ -925,7 +925,7 @@ public class TransactionStore {
             return new TMVMap<>(config, getKeyType(), getValueType());
         }
 
-        private static final class TMVMap<K,V> extends MVMap<K,V> {
+        private static final class TMVMap<K,V> extends MVMap<K,V> { // 事务 mvMap
             private final String type;
 
             TMVMap(Map<String, Object> config, DataType<K> keyType, DataType<V> valueType) {

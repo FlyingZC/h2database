@@ -19,25 +19,25 @@ public final class RootReference<K,V> {
      * The root page.
      */
     public final Page<K,V> root;
-    /**
+    /** 写版本号
      * The version used for writing.
      */
     public final long version;
-    /**
+    /** 加锁数量
      * Counter of reentrant locks.
      */
     private final byte holdCount;
-    /**
+    /** 持有锁的 线程 id
      * Lock owner thread id.
      */
     private final long ownerId;
-    /**
+    /** 上一个版本的 root reference.
      * Reference to the previous root in the chain.
      * That is the last root of the previous version, which had any data changes.
      * Versions without any data changes are dropped from the chain, as it built.
      */
     volatile RootReference<K,V> previous;
-    /**
+    /** 成功更新 root 的计数器。
      * Counter for successful root updates.
      */
     final long updateCounter;
@@ -104,14 +104,14 @@ public final class RootReference<K,V> {
 
     // This one is used for version change
     private RootReference(RootReference<K,V> r, long version, int attempt) {
-        RootReference<K,V> previous = r;
+        RootReference<K,V> previous = r; // 保存上一个版本的引用
         RootReference<K,V> tmp;
         while ((tmp = previous.previous) != null && tmp.root == r.root) {
             previous = tmp;
         }
-        this.root = r.root;
+        this.root = r.root; // 设置当前 reference 的 root
         this.version = version;
-        this.previous = previous;
+        this.previous = previous; // 上一个版本的 root reference
         this.updateCounter = r.updateCounter + 1;
         this.updateAttemptCounter = r.updateAttemptCounter + attempt;
         this.holdCount = r.holdCount == 0 ? 0 : (byte)(r.holdCount - 1);
@@ -141,7 +141,7 @@ public final class RootReference<K,V> {
         return canUpdate() ? tryUpdate(new RootReference<>(this, attemptCounter)) : null;
     }
 
-    /**
+    /** 尝试解锁，如果成功则更新版本
      * Try to unlock, and if successful update the version
      *
      * @param version the version
@@ -149,7 +149,7 @@ public final class RootReference<K,V> {
      * @return the new, unlocked and updated, root reference, or null if not successful
      */
     RootReference<K,V> tryUnlockAndUpdateVersion(long version, int attempt) {
-        return canUpdate() ? tryUpdate(new RootReference<>(this, version, attempt)) : null;
+        return canUpdate() ? tryUpdate(new RootReference<>(this, version, attempt)) : null; // 如果当前线程可以更新.则创建 root reference 并原子更新
     }
 
     /**
@@ -175,8 +175,8 @@ public final class RootReference<K,V> {
         // we really need last root of the previous version.
         // Root labeled with version "X" is the LAST known root for that version
         // and therefore the FIRST known root for the version "X+1"
-        for(RootReference<K,V> rootRef = this; rootRef != null; rootRef = rootRef.previous) {
-            if (rootRef.version < oldestVersionToKeep) {
+        for(RootReference<K,V> rootRef = this; rootRef != null; rootRef = rootRef.previous) { // 遍历 root reference 的前驱节点
+            if (rootRef.version < oldestVersionToKeep) { // 当前根节点的版本小于需要保留的最旧版本号时，移除该节点及其之前的所有版本
                 RootReference<K,V> previous;
                 assert (previous = rootRef.previous) == null || previous.getAppendCounter() == 0 //
                         : oldestVersionToKeep + " " + rootRef.previous;
@@ -194,17 +194,17 @@ public final class RootReference<K,V> {
     }
 
 
-    private boolean canUpdate() {
+    private boolean canUpdate() { // 判断当前线程是否可以更新 root reference
         return isFree() || ownerId == Thread.currentThread().getId(); // 没加锁 or 锁被当前线程持有
     }
 
-    public boolean isLockedByCurrentThread() {
-        return holdCount != 0 && ownerId == Thread.currentThread().getId();
+    public boolean isLockedByCurrentThread() { // 判断当前线程是否持有锁
+        return holdCount != 0 && ownerId == Thread.currentThread().getId(); // 锁 owner 是当前线程
     }
 
     private RootReference<K,V> tryUpdate(RootReference<K,V> updatedRootReference) {
         assert canUpdate();
-        return root.map.compareAndSetRoot(this, updatedRootReference) ? updatedRootReference : null;
+        return root.map.compareAndSetRoot(this, updatedRootReference) ? updatedRootReference : null; // 原子更新 根节点->mvMap->rootReference
     }
 
     long getVersion() {

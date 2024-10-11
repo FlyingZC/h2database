@@ -70,7 +70,7 @@ public final class Transaction {
     private static final String[] STATUS_NAMES = {
             "CLOSED", "OPEN", "PREPARED", "COMMITTED", "ROLLING_BACK", "ROLLED_BACK"
     };
-    /** 我们在事务中存储的“操作id”中有多少位属于日志id（其余的属于事务id）。
+    /** 我们在事务中存储的“operation id”中有多少位属于日志id（其余的属于事务id）。
      * How many bits of the "operation id" we store in the transaction belong to the
      * log id (the rest belong to the transaction id).
      */
@@ -165,7 +165,7 @@ public final class Transaction {
      */
     private RootReference<Long,Record<?,?>>[] undoLogRootReferences;
 
-    /** 事务 id -> transaction map
+    /** 事务 id -> transaction map.
      * Map of transactional maps for this transaction
      */
     private final Map<Integer, TransactionMap<?,?>> transactionMaps = new HashMap<>();
@@ -213,11 +213,11 @@ public final class Transaction {
      */
     private long setStatus(int status) {
         while (true) {
-            long currentState = statusAndLogId.get();
-            long logId = getLogId(currentState);
-            int currentStatus = getStatus(currentState);
+            long currentState = statusAndLogId.get(); // 当前 state & logId
+            long logId = getLogId(currentState); // 获取当前 undo log id
+            int currentStatus = getStatus(currentState); // 1.获取当前状态
             boolean valid;
-            switch (status) { // 判断当前状态允许变更为目标状态,然后变更为目标状态
+            switch (status) { // 2.判断当前状态允许变更为目标状态,然后变更为目标状态
                 case STATUS_ROLLING_BACK:
                     valid = currentStatus == STATUS_OPEN;
                     break;
@@ -251,9 +251,9 @@ public final class Transaction {
                         "Transaction was illegally transitioned from {0} to {1}",
                         getStatusName(currentStatus), getStatusName(status));
             }
-            long newState = composeState(status, logId, hasRollback(currentState)); // 2.新状态
+            long newState = composeState(status, logId, hasRollback(currentState)); // 2.新状态(transaction status + undo log id)
             if (statusAndLogId.compareAndSet(currentState, newState)) { // 3.原子变更
-                return currentState;
+                return currentState; // 4.返回当前状态(修改之前的)
             }
         }
     }
@@ -497,10 +497,10 @@ public final class Transaction {
         int previousStatus = STATUS_OPEN;
         try {
             long state = setStatus(STATUS_COMMITTED); // 2.设置状态为 已提交
-            hasChanges = hasChanges(state); // 3.判断是否有更改
+            hasChanges = hasChanges(state); // 3.判断是否有更改(undo log id 不为0)
             previousStatus = getStatus(state); // 获取上一个状态
             if (hasChanges) {
-                store.commit(this, previousStatus == STATUS_COMMITTED); // 4.如果有更改，执行提交操作
+                store.commit(this, previousStatus == STATUS_COMMITTED); // 4.如果有更改, transaction store执行提交操作
             }
         } catch (Throwable e) {
             ex = e;
@@ -557,11 +557,11 @@ public final class Transaction {
         Throwable ex = null;
         int status = STATUS_OPEN;
         try {
-            long lastState = setStatus(STATUS_ROLLED_BACK); // 尝试设置事务状态为 ROLLED_BACK，并获取之前的事务状态
-            status = getStatus(lastState); // 根据之前的事务状态获取当前事务状态
-            long logId = getLogId(lastState); // 获取事务的日志 ID
+            long lastState = setStatus(STATUS_ROLLED_BACK); // 1.尝试设置事务状态为 ROLLED_BACK，并获取之前的事务状态
+            status = getStatus(lastState); // 2.根据之前的事务状态获取当前事务状态
+            long logId = getLogId(lastState); // 3.获取事务的日志 ID
             if (logId > 0) {
-                store.rollbackTo(this, logId, 0); // 如果日志 ID 有效，则执行回滚到指定的日志 ID
+                store.rollbackTo(this, logId, 0); // 4.如果日志 ID 有效，则执行回滚到指定的日志 ID (从当前事务最大的 log id 回滚到 0)
             }
         } catch (Throwable e) {
             status = getStatus(); // 异常发生时重新获取当前事务状态
@@ -641,8 +641,8 @@ public final class Transaction {
      * Transition this transaction into a closed state.
      */
     void closeIt() {
-        transactionMaps.clear();
-        long lastState = setStatus(STATUS_CLOSED);
+        transactionMaps.clear(); // 清理 transaction map
+        long lastState = setStatus(STATUS_CLOSED); // 设置状态 closed
         store.store.deregisterVersionUsage(txCounter);
         if((hasChanges(lastState) || hasRollback(lastState))) {
             notifyAllWaitingTransactions();

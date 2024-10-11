@@ -2137,4 +2137,26 @@ public class TestMVStore extends TestBase {
             System.out.println();
         }
     }
+
+    /**
+     * commit 一次对应一个 version, 一个 version 对应一个 chunk
+     * 
+     * 每一个chunk包含了每个版本的变化(修改的 page 和 新的 root page,没有修改的 page 复用之前的)
+     */
+    @Test
+    public void test04_more_put() {
+        String fileName = getBaseDir() + "/" + getTestName();
+        FileUtils.delete(fileName);
+        MVStore s = MVStore.open(fileName);
+        MVMap<Integer, String> map = s.openMap("data");
+        for (int i = 0; i < 400; i++) {
+            map.put(i, "Hello-" + i);
+        }
+        s.commit();
+        for (int i = 0; i < 100; i++) {
+            map.put(i, "Hi-" + i);
+        }
+        s.commit();
+        s.close();
+    }
 }

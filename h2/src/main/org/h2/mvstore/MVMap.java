@@ -44,14 +44,14 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      */
     private final AtomicReference<RootReference<K,V>> root;
 
-    private final int id;
+    private final int id; // 当前 mvMap 的唯一 id
     private final long createVersion;
-    private final DataType<K> keyType;
-    private final DataType<V> valueType;
-    private final int keysPerPage;
-    private final boolean singleWriter;
-    private final K[] keysBuffer;
-    private final V[] valuesBuffer;
+    private final DataType<K> keyType; // 存储的 key 类型
+    private final DataType<V> valueType; // 存储的 value 类型
+    private final int keysPerPage; // 每个 page 存储的 key 数量,默认48
+    private final boolean singleWriter; // 只有开启了 singleWriter 参数,才会先写缓冲区(追加写).不开启的话都是直接写到 btree 上
+    private final K[] keysBuffer; // key 缓冲,最终会写到 btree 上
+    private final V[] valuesBuffer; // value 缓冲,最终会写到 btree 上
 
     private final Object lock = new Object();
     private volatile boolean notificationRequested;
@@ -87,7 +87,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
     // meta map constructor
     MVMap(MVStore store, int id, DataType<K> keyType, DataType<V> valueType) {
         this(store, keyType, valueType, id, 0, new AtomicReference<>(), store.getKeysPerPage(), false); // 1.初始化一些属性
-        setInitialRoot(createEmptyLeaf(), store.getCurrentVersion()); // 2.创建叶子节点; 3.设置 root reference
+        setInitialRoot(createEmptyLeaf(), store.getCurrentVersion()); // 2.创建叶子节点(root page节点); 3.设置 root reference
     }
 
     private MVMap(MVStore store, DataType<K> keyType, DataType<V> valueType, int id, long createVersion,
@@ -99,8 +99,8 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         this.valueType = valueType;
         this.root = root;
         this.keysPerPage = keysPerPage;
-        this.keysBuffer = singleWriter ? keyType.createStorage(keysPerPage) : null;
-        this.valuesBuffer = singleWriter ? valueType.createStorage(keysPerPage) : null;
+        this.keysBuffer = singleWriter ? keyType.createStorage(keysPerPage) : null; // 创建 key 缓冲数组
+        this.valuesBuffer = singleWriter ? valueType.createStorage(keysPerPage) : null; // 创建 value 缓冲数组
         this.singleWriter = singleWriter;
         this.avgKeySize = keyType.isMemoryEstimationAllowed() ? new AtomicLong() : null;
         this.avgValSize = valueType.isMemoryEstimationAllowed() ? new AtomicLong() : null;
@@ -136,7 +136,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         return DataUtils.META_MAP + Integer.toHexString(mapId);
     }
 
-    /**
+    /** 添加或替换键值对。
      * Add or replace a key-value pair.
      *
      * @param key the key (may not be null)
@@ -442,7 +442,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         clearIt();
     }
 
-    /**
+    /** 更新为 empty root page
      * Remove all entries and return the root reference.
      *
      * @return the new root reference
@@ -650,7 +650,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
             root = root.copy(this, false); // 由于无法确定哪个线程会获胜，因此 copy root 让每个 map 实例拥有自己的副本
         }
         setInitialRoot(root, version - 1); // 2.设置初始根页面和版本号
-        setWriteVersion(version);
+        setWriteVersion(version); // 3.设置 write version
     }
 
     private Page<K,V> readOrCreateRootPage(long rootPos) {
@@ -837,11 +837,11 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      * @return current root reference
      */
     public RootReference<K,V> flushAndGetRoot() {
-        RootReference<K,V> rootReference = getRoot(); // 获取根节点引用
-        if (singleWriter && rootReference.getAppendCounter() > 0) {
-            return flushAppendBuffer(rootReference, true);
+        RootReference<K,V> rootReference = getRoot(); // 1.获取根节点引用
+        if (singleWriter && rootReference.getAppendCounter() > 0) { // 2.若有缓冲待写入的，刷新缓冲区
+            return flushAppendBuffer(rootReference, true); // 刷新 append buffer 到 btree
         }
-        return rootReference;
+        return rootReference; // 3.返回根节点引用
     }
 
     /** 设置初始根节点
@@ -1212,7 +1212,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         store.registerUnsavedMemoryAndCommitIfNeeded(target.getMemory());
     }
 
-    /**
+    /** 当缓冲区超出阈值时，将缓冲区中的数据插入到树结构的根页面
      * If map was used in append mode, this method will ensure that append buffer
      * is flushed - emptied with all entries inserted into map as a new leaf.
      * @param rootReference current RootReference
@@ -1350,23 +1350,23 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
     private static <K,V> Page<K,V> replacePage(CursorPos<K,V> path, Page<K,V> replacement,
             IntValueHolder unsavedMemoryHolder) {
         int unsavedMemory = replacement.isSaved() ? 0 : replacement.getMemory();
-        while (path != null) {
-            Page<K,V> parent = path.page;
+        while (path != null) { // 父节点 pos 不为空
+            Page<K,V> parent = path.page; // 父节点
             // condition below should always be true, but older versions (up to 1.4.197)
             // may create single-childed (with no keys) internal nodes, which we skip here
-            if (parent.getKeyCount() > 0) {
-                Page<K,V> child = replacement;
-                replacement = parent.copy();
+            if (parent.getKeyCount() > 0) { // 父节点有键值
+                Page<K,V> child = replacement; // 当前替换节点
+                replacement = parent.copy(); // 创建一个新的 parent 页面
                 replacement.setChild(path.index, child);
                 unsavedMemory += replacement.getMemory();
             }
-            path = path.parent;
+            path = path.parent; // 移动到上一级路径
         }
         unsavedMemoryHolder.value += unsavedMemory;
-        return replacement;
+        return replacement; // 返回替换后的最终 root page
     }
 
-    /** 将条目附加到此地图。此方法不是线程安全的，既不能同时使用，也不能与更新此映射的任何方法结合使用。  可以同时使用非更新方法，但不保证最新附加值可见。
+    /** 追加到 buffer,超出后再统一刷到 btree 上.将条目附加到此地图。此方法不是线程安全的，既不能同时使用，也不能与更新此映射的任何方法结合使用。  可以同时使用非更新方法，但不保证最新附加值可见。
      * Appends entry to this map. this method is NOT thread safe and can not be used
      * neither concurrently, nor in combination with any method that updates this map.
      * Non-updating method may be used concurrently, but latest appended values
@@ -1381,7 +1381,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
             int appendCounter = rootReference.getAppendCounter(); // 2.获取当前写入下标
             try {
                 if (appendCounter >= keysPerPage) { // 3.数量超出则 flush buffer
-                    rootReference = flushAppendBuffer(rootReference, false);
+                    rootReference = flushAppendBuffer(rootReference, false); // 如果超过了，则先将未保存到 btree 页面上的 buffer 数据保存到 btree 上!!!!! TODO zc 逻辑
                     appendCounter = rootReference.getAppendCounter();
                     assert appendCounter < keysPerPage;
                 }
@@ -1614,7 +1614,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      * @param <V> value type of the map
      */
     public abstract static class DecisionMaker<V> {
-        /**
+        /** 事务回滚
          * Decision maker for transaction rollback.
          */
         public static final DecisionMaker<Object> DEFAULT = new DecisionMaker<>() {
@@ -1734,11 +1734,11 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         public void reset() {}
     }
 
-    /** 添加、替换或删除键值对
+    /** 添加、替换 或 删除 键值对
      * Add, replace or remove a key-value pair.
      *
      * @param key the key (may not be null)
-     * @param value new value, it may be null when removal is intended
+     * @param value new value, it may be null when removal is intended 新值，当打算删除时它可能为空
      * @param decisionMaker command object to make choices during transaction.
      * @return previous value, if mapping for that key existed, or null otherwise
      */
@@ -1746,9 +1746,9 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
         IntValueHolder unsavedMemoryHolder = new IntValueHolder();
         int attempt = 0;
         while(true) {
-            RootReference<K,V> rootReference = flushAndGetRoot(); // 1.获取 mvMap 根节点
-            boolean locked = rootReference.isLockedByCurrentThread();
-            if (!locked) {
+            RootReference<K,V> rootReference = flushAndGetRoot(); // 1.获取 mvMap 根节点引用
+            boolean locked = rootReference.isLockedByCurrentThread(); // 2.1.判断当前线程是否已经锁定了根节点
+            if (!locked) { // 2.2.如果当前线程没有锁定根节点，则尝试加锁
                 if (attempt++ == 0) {
                     beforeWrite();
                 }
@@ -1757,24 +1757,24 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                     locked = true;
                 }
             }
-            Page<K,V> rootPage = rootReference.root;
-            long version = rootReference.version;
+            Page<K,V> rootPage = rootReference.root; // 3.获取根节点 root page
+            long version = rootReference.version; // 写版本号
             CursorPos<K,V> tip;
             V result;
             unsavedMemoryHolder.value = 0;
             try {
-                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 2.从根节点开始，根据 key 遍历 tree,找到 key 的位置 pos
+                CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key); // 2.从根节点开始，根据 key 遍历 btree,找到 key 的位置 pos
                 if (!locked && rootReference != getRoot()) {
                     continue;
                 }
-                Page<K,V> p = pos.page; // 3.获取插入位置对应的 pos
-                int index = pos.index;
-                tip = pos;
-                pos = pos.parent;
-                result = index < 0 ? null : p.getValue(index); // 4.根据索引获取 page 上的值,如果是插入操作此处为 null,因为原来没有值
+                Page<K,V> p = pos.page; // 3.获取操作(插入/删除..)位置对应的 pos 对应的 page
+                int index = pos.index; // 获取当前 key 对应的在 page 上的下标
+                tip = pos; // 保存当前 pos 引用
+                pos = pos.parent; // 注意：这里需要获取当前 pos 对应的父节点 pos(根节点的 parent pos 为 null)，因为后面需要根据父节点来更新 root page
+                result = index < 0 ? null : p.getValue(index); // 4.根据 index 获取 page 上的当前值(如果是插入操作当前值为 null)
                 Decision decision = decisionMaker.decide(result, value, tip); // 5.根据 当前值、目标值 和 游标位置 决定操作类型
 
-                switch (decision) {
+                switch (decision) { // 6.具体 mvMap 操作
                     case REPEAT:
                         decisionMaker.reset();
                         continue;
@@ -1784,7 +1784,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                             continue;
                         }
                         return result;
-                    case REMOVE: { // remove 操作
+                    case REMOVE: { // 6.1.remove 操作
                         if (index < 0) {
                             if (!locked && rootReference != getRoot()) {
                                 decisionMaker.reset();
@@ -1820,30 +1820,30 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                             }
                         }
                         p = p.copy(); // 复制页面并移除键
-                        p.remove(index);
+                        p.remove(index); // 删除 page 指定 index 的值
                         break;
                     }
-                    case PUT: { // put 操作
-                        value = decisionMaker.selectValue(result, value);
-                        p = p.copy(); // copy page
-                        if (index < 0) { // 插入操作
-                            p.insertLeaf(-index - 1, key, value); // 插入叶子节点
+                    case PUT: { // 6.2.put 操作
+                        value = decisionMaker.selectValue(result, value); // 6.2.1.获取当前值(如果是事务commit操作,此处会获取 VersionedValueUncommitted 里的 defaultRow)
+                        p = p.copy(); // 6.2.2.copy page
+                        if (index < 0) { // 6.2.3.插入操作
+                            p.insertLeaf(-index - 1, key, value); // 6.2.3.1.插入 key, value 到叶子节点的指定 index
                             int keyCount;
                             while ((keyCount = p.getKeyCount()) > store.getKeysPerPage()
                                     || p.getMemory() > store.getMaxPageSize()
-                                    && keyCount > (p.isLeaf() ? 1 : 2)) {
+                                    && keyCount > (p.isLeaf() ? 1 : 2)) { // 6.2.3.2.page 分裂操作,触发条件: key数量超过每页最大键数量限制(默认48) 或 page内存超过最大page大小
                                 long totalCount = p.getTotalCount();
-                                int at = keyCount >> 1;
-                                K k = p.getKey(at);
-                                Page<K,V> split = p.split(at);
-                                unsavedMemoryHolder.value += p.getMemory() + split.getMemory();
-                                if (pos == null) {
-                                    K[] keys = p.createKeyStorage(1);
-                                    keys[0] = k;
-                                    Page.PageReference<K,V>[] children = Page.createRefStorage(2);
-                                    children[0] = new Page.PageReference<>(p);
-                                    children[1] = new Page.PageReference<>(split);
-                                    p = Page.createNode(this, keys, children, totalCount, 0);
+                                int at = keyCount >> 1; // 6.2.3.2.1.计算 page 分裂位置(中间位置)
+                                K k = p.getKey(at); // 6.2.3.2.2.获取 page 中间位置的 key
+                                Page<K,V> split = p.split(at); // 6.2.3.2.3.分裂 page.执行完毕后 split 为分裂后的第二个页面, p 为分裂后的第一个页面
+                                unsavedMemoryHolder.value += p.getMemory() + split.getMemory(); // 6.2.3.2.4.记录需要保存的内存
+                                if (pos == null) { // 6.2.3.2.5.如果当前节点为根节点,则创建一个新的节点作为根节点
+                                    K[] keys = p.createKeyStorage(1); // 创建 key 存储空间(1)
+                                    keys[0] = k; // 插入 key
+                                    Page.PageReference<K,V>[] children = Page.createRefStorage(2); // 创建 children 存储空间(2)
+                                    children[0] = new Page.PageReference<>(p); // 插入孩子节点0 page
+                                    children[1] = new Page.PageReference<>(split); // 插入孩子节点1 split
+                                    p = Page.createNode(this, keys, children, totalCount, 0); // 创建非叶子节点作为 root 节点, 传入孩子节点信息
                                     break;
                                 }
                                 Page<K,V> c = p;
@@ -1855,12 +1855,12 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                                 p.insertNode(index, k, c);
                             }
                         } else {
-                            p.setValue(index, value);
+                            p.setValue(index, value); // 6.2.4.更新操作,直接设置 page 指定下标对应的值
                         }
                         break;
                     }
                 }
-                rootPage = replacePage(pos, p, unsavedMemoryHolder); // 替换 root page
+                rootPage = replacePage(pos, p, unsavedMemoryHolder); // 7.替换 root page (pos 为父节点的 pos)
                 if (!locked) { // 未上锁
                     rootReference = rootReference.updateRootPage(rootPage, attempt); // 更新 root page 引用
                     if (rootReference == null) { // 没有更新成功
@@ -1874,7 +1874,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
                 return result;
             } finally {
                 if(locked) {
-                    unlockRoot(rootPage);
+                    unlockRoot(rootPage); // 解锁 root
                 }
             }
         }

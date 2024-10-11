@@ -5,7 +5,7 @@
  */
 package org.h2.mvstore;
 
-/**
+/** 光标中的位置。  实例表示链表中的一个节点，它跟踪从叶节点内的特定（目标）键一直到根（自下而上的路径）的路径。
  * A position in a cursor.
  * Instance represents a node in the linked list, which traces path
  * from a specific (target) key within a leaf node all the way up to te root
@@ -13,19 +13,19 @@ package org.h2.mvstore;
  */
 public final class CursorPos<K,V> {
 
-    /**
+    /** 对应的 page
      * The page at the current level.
      */
     public Page<K,V> page;
 
-    /**
+    /** 对应 page 上的下标(负数表示插入下标)
      * Index of the key (within page above) used to go down to a lower level
      * in case of intermediate nodes, or index of the target key for leaf a node.
      * In a later case, it could be negative, if the key is not present.
      */
     public int index;
 
-    /**
+    /** 父节点位置.根节点的 parent pos 为 null
      * Next node in the linked list, representing the position within parent level,
      * or null, if we are at the root level already.
      */
@@ -58,9 +58,9 @@ public final class CursorPos<K,V> {
                 index = -index;
             }
             cursorPos = new CursorPos<>(page, index, cursorPos);
-            page = page.getChildPage(index); // 继续向下遍历到指定索引的子页面
+            page = page.getChildPage(index); // 继续向下遍历到指定索引的子页面.如果子节点不在内存中,会从磁盘上加载到内存.
         }
-        return new CursorPos<>(page, page.binarySearch(key), cursorPos); // 在叶子节点中搜索 key 的位置
+        return new CursorPos<>(page, page.binarySearch(key), cursorPos); // 在叶子节点存储的 keys 中, 二分搜索 key 的位置
     }
 
     /**

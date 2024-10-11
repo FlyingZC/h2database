@@ -428,14 +428,14 @@ public abstract class Page<K,V> implements Cloneable {
      * @param bCount size of the second array/
      * @return the second array.
      */
-    final K[] splitKeys(int aCount, int bCount) {
+    final K[] splitKeys(int aCount, int bCount) { // 将当前的keys数组分割成两个数组
         assert aCount + bCount <= getKeyCount();
-        K[] aKeys = createKeyStorage(aCount);
-        K[] bKeys = createKeyStorage(bCount);
-        System.arraycopy(keys, 0, aKeys, 0, aCount);
-        System.arraycopy(keys, getKeyCount() - bCount, bKeys, 0, bCount);
-        keys = aKeys;
-        return bKeys;
+        K[] aKeys = createKeyStorage(aCount); // 创建存储第一个数组的容器
+        K[] bKeys = createKeyStorage(bCount); // 创建存储第二个数组的容器
+        System.arraycopy(keys, 0, aKeys, 0, aCount); // 将原数组的前aCount个元素复制到aKeys中
+        System.arraycopy(keys, getKeyCount() - bCount, bKeys, 0, bCount); // 将原数组后bCount个元素复制到bKeys中
+        keys = aKeys; // 更新原数组为aKeys
+        return bKeys; // 返回分割出的第二个数组
     }
 
     /**
@@ -570,8 +570,8 @@ public abstract class Page<K,V> implements Cloneable {
             }
         }
         K[] newKeys = createKeyStorage(keyCount - 1);
-        DataUtils.copyExcept(keys, newKeys, keyCount, index);
-        keys = newKeys;
+        DataUtils.copyExcept(keys, newKeys, keyCount, index); // 1.移除元素
+        keys = newKeys; // 返回新 key
     }
 
     /**
@@ -1151,10 +1151,10 @@ public abstract class Page<K,V> implements Cloneable {
         }
 
         @Override
-        public Page<K,V> getChildPage(int index) {
-            PageReference<K,V> ref = children[index];
-            Page<K,V> page = ref.getPage();
-            if(page == null) {
+        public Page<K,V> getChildPage(int index) { // 获取指定下标对应的 child page
+            PageReference<K,V> ref = children[index]; // 获取子页面的引用
+            Page<K,V> page = ref.getPage(); // 获取引用对应的 child page
+            if(page == null) { // page 为空, 则从磁盘中读取
                 page = map.readPage(ref.getPos());
                 assert ref.getPos() == page.getPos();
                 assert ref.count == page.getTotalCount();
@@ -1504,26 +1504,26 @@ public abstract class Page<K,V> implements Cloneable {
 
         @Override
         public V getValue(int index) {
-            return values == null ? null : values[index];
+            return values == null ? null : values[index]; // 获取 values 数组指定下标的值
         }
 
         @Override
-        public Page<K,V> split(int at) {
+        public Page<K,V> split(int at) { // at: 当前分裂位置的下标
             assert !isSaved();
-            int b = getKeyCount() - at;
-            K[] bKeys = splitKeys(at, b);
+            int b = getKeyCount() - at; // 计算新页面中的键值对数量
+            K[] bKeys = splitKeys(at, b); // 分裂当前页面的键，并为新页面创建键数组
             V[] bValues = createValueStorage(b);
             if(values != null) {
-                V[] aValues = createValueStorage(at);
-                System.arraycopy(values, 0, aValues, 0, at);
+                V[] aValues = createValueStorage(at); // 为当前页面（分裂后的部分）创建新的值存储空间
+                System.arraycopy(values, 0, aValues, 0, at); // 将当前页面的值分裂到新的存储空间中
                 System.arraycopy(values, at, bValues, 0, b);
                 values = aValues;
             }
-            Page<K,V> newPage = createLeaf(map, bKeys, bValues, 0);
+            Page<K,V> newPage = createLeaf(map, bKeys, bValues, 0); // 创建新页面
             if(isPersistent()) {
                 recalculateMemory();
             }
-            return newPage;
+            return newPage; // 返回分裂后的新页面
         }
 
         @Override
@@ -1559,7 +1559,7 @@ public abstract class Page<K,V> implements Cloneable {
         @Override
         public V setValue(int index, V value) { // 当前 page 指定 index 设置 value
             values = values.clone();
-            V old = setValueInternal(index, value); // 设置值,返回旧值
+            V old = setValueInternal(index, value); // 设置(更新)值,返回旧值
             if(isPersistent()) {
                 if (!map.isMemoryEstimationAllowed()) {
                     addMemory(map.evaluateMemoryForValue(value) -
@@ -1599,7 +1599,7 @@ public abstract class Page<K,V> implements Cloneable {
         @Override
         public void remove(int index) {
             int keyCount = getKeyCount();
-            super.remove(index);
+            super.remove(index); // 1.移除 key
             if (values != null) {
                 if(isPersistent()) {
                     if (map.isMemoryEstimationAllowed()) {
@@ -1610,7 +1610,7 @@ public abstract class Page<K,V> implements Cloneable {
                     }
                 }
                 V[] newValues = createValueStorage(keyCount - 1);
-                DataUtils.copyExcept(values, newValues, keyCount, index);
+                DataUtils.copyExcept(values, newValues, keyCount, index); // 2.移除 value
                 values = newValues;
             }
         }

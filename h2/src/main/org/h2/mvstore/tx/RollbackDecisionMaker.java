@@ -30,25 +30,25 @@ final class RollbackDecisionMaker extends MVMap.DecisionMaker<Record<?,?>> {
 
     @SuppressWarnings({"unchecked","rawtypes"})
     @Override
-    public MVMap.Decision decide(Record existingValue, Record providedValue) {
+    public MVMap.Decision decide(Record existingValue, Record providedValue) { // 回滚决定
         assert decision == null;
         if (existingValue == null) {
             // normally existingValue will always be there except of db initialization
             // where some undo log entry was captured on disk but actual map entry was not
             decision = MVMap.Decision.ABORT;
         } else {
-            VersionedValue<Object> valueToRestore = existingValue.oldValue;
+            VersionedValue<Object> valueToRestore = existingValue.oldValue; // 1.获取 undo log record 里当前存储的旧值
             long operationId;
             if (valueToRestore == null ||
                     (operationId = valueToRestore.getOperationId()) == 0 ||
                     TransactionStore.getTransactionId(operationId) == transactionId
                             && TransactionStore.getLogId(operationId) < toLogId) {
-                int mapId = existingValue.mapId;
-                MVMap<Object, VersionedValue<Object>> map = store.openMap(mapId);
+                int mapId = existingValue.mapId; // 2.当前值对应的 map id
+                MVMap<Object, VersionedValue<Object>> map = store.openMap(mapId); // 3.获取对应 mvMap
                 if (map != null && !map.isClosed()) {
                     Object key = existingValue.key;
                     VersionedValue<Object> previousValue = map.operate(key, valueToRestore,
-                            MVMap.DecisionMaker.DEFAULT);
+                            MVMap.DecisionMaker.DEFAULT); // 4.从 mvMap 上移除 VersionedValueUncommitted
                     listener.onRollback(map, key, previousValue, valueToRestore);
                 }
             }

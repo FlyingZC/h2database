@@ -261,8 +261,8 @@ public abstract class FileStore<C extends Chunk<C>>
 
     public final void bind(MVStore mvStore) {
         if(this.mvStore != mvStore) { // 默认 bind 时创建的是空的 mvMap,只是为了和 mvStore 进行绑定
-            long pos = layout == null ? 0L : layout.getRootPage().getPos();
-            layout = new MVMap<>(mvStore, 0, StringDataType.INSTANCE, StringDataType.INSTANCE); // 1.创建空的 mvMap
+            long pos = layout == null ? 0L : layout.getRootPage().getPos(); // 获取 layout 根节点的 pos
+            layout = new MVMap<>(mvStore, 0, StringDataType.INSTANCE, StringDataType.INSTANCE); // 1.创建空的 layout mvMap
             layout.setRootPos(pos, mvStore.getCurrentVersion()); // 1.1.root节点此时也是创建 empty 节点, version是0
             this.mvStore = mvStore; // 2.绑定 mvStore
             mvStore.resetLastMapId(lastChunk == null ? 0 : lastChunk.mapId);
@@ -289,7 +289,7 @@ public abstract class FileStore<C extends Chunk<C>>
         int metaId;
         if (metaIdStr == null) {
             metaId = nextIdSupplier.getAsInt();
-            layout.put(META_ID_KEY, Integer.toHexString(metaId)); // layout mvMap 缓存 meta id
+            layout.put(META_ID_KEY, Integer.toHexString(metaId)); // 1.layout mvMap 缓存 meta id (meta.id -> 1)
         } else {
             metaId = DataUtils.parseHexInt(metaIdStr);
         }
@@ -325,7 +325,7 @@ public abstract class FileStore<C extends Chunk<C>>
      * @return opaque "position" value, that should be used to read the page
      */
     public final long getRootPos(int mapId) {
-        String root = layout.get(MVMap.getMapRootKey(mapId)); // 获取 root key,比如 root.1
+        String root = layout.get(MVMap.getMapRootKey(mapId)); // 从 layout 里获取 root key,比如 root.1
         return root == null ? 0 : DataUtils.parseHexLong(root);
     }
 
@@ -635,7 +635,7 @@ public abstract class FileStore<C extends Chunk<C>>
             layoutRootPos = last.layoutRootPos; // chunk header 里存储了 map 的 root(元数据根页面(page)的位置)
             chunks.put(last.id, last); // 2.缓存最新的 chunk
         }
-        layout.setRootPos(layoutRootPos, lastChunkVersion()); // 3.获取当前 chunk version; 4.设置 mvMap 的 root pos 为当前最新的 chunk
+        layout.setRootPos(layoutRootPos, lastChunkVersion()); // 3.获取当前 chunk version; 4.设置 layout mvMap 的 root pos 为当前最新的 chunk
     }
 
     protected final void registerDeadChunk(C chunk) {
@@ -921,7 +921,7 @@ public abstract class FileStore<C extends Chunk<C>>
         lastCommitTime = getTimeSinceCreation();
         mvStore.resetLastMapId(lastMapId());
         mvStore.setCurrentVersion(lastChunkVersion());
-        MVMap<String, String> metaMap = mvStore.openMetaMap(); // 3.打开元数据映射
+        MVMap<String, String> metaMap = mvStore.openMetaMap(); // 3.打开元数据映射 meta map
         scrubLayoutMap(metaMap);
         return metaMap;
     }
@@ -1942,7 +1942,7 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     /**
-     * Read a page.读取page并缓存
+     * Read a page.读取 page 并缓存
      *
      * @param map the map
      * @param pos the page position

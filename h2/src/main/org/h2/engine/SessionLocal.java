@@ -695,7 +695,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                 // do not clean the temp tables if the last command was a
                 // create/drop
                 cleanTempTables(false);
-                if (autoCommitAtTransactionEnd) {
+                if (autoCommitAtTransactionEnd) { // 重置 autoCommit 标识
                     autoCommit = true;
                     autoCommitAtTransactionEnd = false;
                 }
@@ -801,8 +801,8 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public void rollback() {
         beforeCommitOrRollback();
-        if (hasTransaction()) {
-            rollbackTo(null);
+        if (hasTransaction()) { // 在事务中
+            rollbackTo(null); // 回滚
         }
         idsToRelease = null;
         cleanTempTables(false);
@@ -813,7 +813,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         endTransaction();
     }
 
-    /**
+    /** 部分回滚当前事务
      * Partially roll back the current transaction.
      *
      * @param savepoint the savepoint to which should be rolled back
@@ -823,7 +823,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         if (hasTransaction()) {
             markUsedTablesAsUpdated();
             if (savepoint == null) {
-                transaction.rollback();
+                transaction.rollback(); // 回滚事务
                 transaction = null;
             } else {
                 transaction.rollbackToSavepoint(savepoint.transactionSavepoint);
@@ -963,7 +963,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
 
     private void unlockAll() {
         if (!locks.isEmpty()) {
-            Table[] array = locks.toArray(new Table[0]);
+            Table[] array = locks.toArray(new Table[0]); // unlock tables
             for (Table t : array) {
                 if (t != null) {
                     t.unlock(this);

@@ -24,12 +24,12 @@ final class Record<K,V> {
     // -1 is a bogus map id
     static final Record<?,?> COMMIT_MARKER = new Record<>(-1, null, null);
 
-    /** 关联的 map id.
+    /** 当前 undoLog 操作关联的 map id.
      * Map id for this change is related to
      */
     final int mapId;
 
-    /** map 的 key.
+    /** mapId 对应的 mvMap 上当前 undoLog 操作的 key(比如 primary index 的 主键)
      * Key of the changed map entry key
      */
     final K key;
