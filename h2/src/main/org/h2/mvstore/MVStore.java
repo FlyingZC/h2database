@@ -793,7 +793,7 @@ public final class MVStore implements AutoCloseable {
 
     private long store(boolean syncWrite) {
         assert storeLock.isHeldByCurrentThread();
-        if (isOpenOrStopping() && hasUnsavedChanges() && storeOperationInProgress.compareAndSet(false, true)) {
+        if (isOpenOrStopping() && hasUnsavedChanges() && storeOperationInProgress.compareAndSet(false, true)) { // 判断 mvMap 有变更
             try {
                 @SuppressWarnings({"NonAtomicVolatileUpdate", "NonAtomicOperationOnVolatileField"})
                 long result = ++currentVersion;
@@ -805,7 +805,7 @@ public final class MVStore implements AutoCloseable {
                                 DataUtils.ERROR_WRITING_FAILED, "This store is read-only");
                     }
                     fileStore.dropUnusedChunks();
-                    storeNow(syncWrite);
+                    storeNow(syncWrite); // 持久化存储
                 }
                 return result;
             } finally {
@@ -840,7 +840,7 @@ public final class MVStore implements AutoCloseable {
             long version = currentVersion;
 
             assert storeLock.isHeldByCurrentThread();
-            fileStore.storeIt(collectChangedMapRoots(version), version, syncWrite);
+            fileStore.storeIt(collectChangedMapRoots(version), version, syncWrite); // 1.收集自上次保存以来有更改的MVMap根页面; 2.存储
 
             // some pages might have been changed in the meantime (in the newest
             // version)
@@ -904,10 +904,10 @@ public final class MVStore implements AutoCloseable {
         if (metaChanged) {
             return true;
         }
-        long lastStoredVersion = currentVersion - 1;
-        for (MVMap<?, ?> m : maps.values()) {
+        long lastStoredVersion = currentVersion - 1; // 最新一次持久化版本号 
+        for (MVMap<?, ?> m : maps.values()) { // 遍历所有 mvMap
             if (!m.isClosed()) {
-                if(m.hasChangesSince(lastStoredVersion)) {
+                if(m.hasChangesSince(lastStoredVersion)) { // 和上次持久化的版本号比对, 判断当前 mvMap 是否有变更
                     return true;
                 }
             }
@@ -1578,14 +1578,14 @@ public final class MVStore implements AutoCloseable {
         return state <= STATE_STOPPING;
     }
 
-    /**
+    /** 设置自动提交更改的最大延迟（以毫秒为单位）。
      * Set the maximum delay in milliseconds to auto-commit changes.
      * <p>
      * To disable auto-commit, set the value to 0. In this case, changes are
-     * only committed when explicitly calling commit.
+     * only committed when explicitly calling commit.要禁用自动提交，请将值设置为 0。在这种情况下，仅在显式调用 commit 时才会提交更改。
      * <p>
      * The default is 1000, meaning all changes are committed after at most one
-     * second.
+     * second.默认值为 1000，这意味着所有更改最多在一秒后提交。
      *
      * @param millis the maximum delay
      */

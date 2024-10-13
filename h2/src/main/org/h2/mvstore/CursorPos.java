@@ -53,7 +53,7 @@ public final class CursorPos<K,V> {
     static <K,V> CursorPos<K,V> traverseDown(Page<K,V> page, K key) {
         CursorPos<K,V> cursorPos = null;
         while (!page.isLeaf()) { // 当前页面不是叶子节点时，继续向下遍历
-            int index = page.binarySearch(key) + 1; // 二分搜索
+            int index = page.binarySearch(key) + 1; // 二分搜索,定位到 child page 在当前 page 里的 index
             if (index < 0) {
                 index = -index;
             }

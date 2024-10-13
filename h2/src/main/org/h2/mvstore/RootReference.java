@@ -223,7 +223,7 @@ public final class RootReference<K,V> {
      */
     boolean hasChangesSince(long version, boolean persistent) {
         return persistent && (root.isSaved() ? getAppendCounter() > 0 : getTotalCount() > 0)
-                || getVersion() > version;
+                || getVersion() > version; // root 版本大于给定的 version
     }
 
     int getAppendCounter() {

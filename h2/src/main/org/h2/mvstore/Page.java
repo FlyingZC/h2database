@@ -78,7 +78,7 @@ public abstract class Page<K,V> implements Cloneable {
     private int diskSpaceUsed;
 
     /**
-     * The keys.
+     * The keys.保存的keys.非叶子节点不存储values,叶子节点存储values.
      */
     private K[] keys;
 
@@ -186,7 +186,7 @@ public abstract class Page<K,V> implements Cloneable {
     public static <K,V> Page<K,V> createNode(MVMap<K,V> map, K[] keys, PageReference<K,V>[] children,
                                     long totalCount, int memory) {
         assert keys != null;
-        Page<K,V> page = new NonLeaf<>(map, keys, children, totalCount);
+        Page<K,V> page = new NonLeaf<>(map, keys, children, totalCount); // 创建非叶子节点，指定 children
         page.initMemoryAccount(memory);
         return page;
     }

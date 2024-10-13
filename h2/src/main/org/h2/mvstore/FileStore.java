@@ -196,21 +196,21 @@ public abstract class FileStore<C extends Chunk<C>>
 
     private final Deque<C> deadChunks = new ConcurrentLinkedDeque<>();
 
-    /**
+    /** 后台线程的原子引用
      * Reference to a background thread, which is expected to be running, if any.
      */
     private final AtomicReference<BackgroundWriterThread> backgroundWriterThread = new AtomicReference<>();
 
     private final int autoCompactFillRate;
 
-    /**
+    /** 自动提交和写入更改的延迟（以毫秒为单位）。
      * The delay in milliseconds to automatically commit and write changes.
      */
     private int autoCommitDelay;
 
     private long autoCompactLastFileOpCount;
 
-    private long lastCommitTime;
+    private long lastCommitTime; // 最新一次提交时间, 后台线程每次持久化时候会更新
 
     protected final boolean recoveryMode;
 
@@ -420,15 +420,15 @@ public abstract class FileStore<C extends Chunk<C>>
         if (autoCommitDelay != millis) {
             autoCommitDelay = millis;
             if (!isReadOnly()) {
-                stopBackgroundThread(millis >= 0);
+                stopBackgroundThread(millis >= 0); // 停止后台线程
                 // start the background thread if needed
                 if (millis > 0 && mvStore.isOpen()) {
-                    int sleep = Math.max(10, millis / 3);
-                    BackgroundWriterThread t = new BackgroundWriterThread(this, sleep, toString());
-                    if (backgroundWriterThread.compareAndSet(null, t)) {
-                        t.start();
-                        serializationExecutor = Utils.createSingleThreadExecutor("H2-serialization");
-                        bufferSaveExecutor = Utils.createSingleThreadExecutor("H2-save");
+                    int sleep = Math.max(10, millis / 3); // 计算后台线程写入的间隔
+                    BackgroundWriterThread t = new BackgroundWriterThread(this, sleep, toString()); // 创建后台线程
+                    if (backgroundWriterThread.compareAndSet(null, t)) { 
+                        t.start(); // 启动线程
+                        serializationExecutor = Utils.createSingleThreadExecutor("H2-serialization"); // 创建序列化线程
+                        bufferSaveExecutor = Utils.createSingleThreadExecutor("H2-save"); // 创建持久化线程
                     }
                 }
             }
@@ -562,7 +562,7 @@ public abstract class FileStore<C extends Chunk<C>>
         }
     }
 
-    private long getTimeSinceCreation() {
+    private long getTimeSinceCreation() { // 计算 mvStore 距离的创建时间
         return Math.max(0, mvStore.getTimeAbsolute() - getCreationTime());
     }
 
@@ -1373,10 +1373,10 @@ public abstract class FileStore<C extends Chunk<C>>
 
 
     final void storeIt(ArrayList<Page<?,?>> changed, long version, boolean syncWrite) throws ExecutionException {
-        lastCommitTime = getTimeSinceCreation();
+        lastCommitTime = getTimeSinceCreation(); // 更新 最新一次提交时间
         serializationExecutorHWM = submitOrRun(serializationExecutor,
                 () -> serializeAndStore(syncWrite, changed, lastCommitTime, version),
-                syncWrite, PIPE_LENGTH, serializationExecutorHWM);
+                syncWrite, PIPE_LENGTH, serializationExecutorHWM); // 将变更的 pages, 提交 序列化任务 到 serializationExecutor 线程执行
     }
 
     private static int submitOrRun(ThreadPoolExecutor executor, Runnable action,
@@ -1408,13 +1408,13 @@ public abstract class FileStore<C extends Chunk<C>>
     private int bufferSaveExecutorHWM;
 
     private void serializeAndStore(boolean syncRun, ArrayList<Page<?,?>> changed, long time, long version) {
-        serializationLock.lock();
+        serializationLock.lock(); // 加锁
         try {
             C lastChunk = null;
             int chunkId = lastChunkId;
             if (chunkId != 0) {
                 chunkId &= Chunk.MAX_ID;
-                lastChunk = chunks.get(chunkId);
+                lastChunk = chunks.get(chunkId); // 1.获取 last chunk
                 assert lastChunk != null : lastChunkId + " ("+chunkId+") " + chunks;
                 // never go backward in time
                 time = Math.max(lastChunk.time, time);
@@ -1422,20 +1422,20 @@ public abstract class FileStore<C extends Chunk<C>>
             C c;
             WriteBuffer buff;
             try {
-                c = createChunk(time, version);
+                c = createChunk(time, version); // 2.根据持久化版本号, 创建新的 chunk
                 buff = getWriteBuffer();
-                serializeToBuffer(buff, changed, c, lastChunk);
-                chunks.put(c.id, c);
+                serializeToBuffer(buff, changed, c, lastChunk); // 3.将变更的 pages 序列化到 buffer
+                chunks.put(c.id, c); // 4.缓存新的 chunk
             } catch (Throwable t) {
                 lastChunkId = chunkId;
                 throw t;
             }
 
             bufferSaveExecutorHWM = submitOrRun(bufferSaveExecutor, () -> storeBuffer(c, buff),
-                    syncRun, 5, bufferSaveExecutorHWM);
+                    syncRun, 5, bufferSaveExecutorHWM); // 5.将 buffer 提交到 bufferSaveExecutor 线程执行, 将缓存刷出
 
             for (Page<?, ?> p : changed) {
-                p.releaseSavedPages();
+                p.releaseSavedPages(); // 6.释放已保存数据页的资源
             }
         } catch (MVStoreException e) {
             mvStore.panic(e);
@@ -1832,9 +1832,9 @@ public abstract class FileStore<C extends Chunk<C>>
             if (mvStore.isOpen() && !isReadOnly()) {
                 // could also commit when there are many unsaved pages,
                 // but according to a test it doesn't really help
-                long time = getTimeSinceCreation();
-                if (time > lastCommitTime + autoCommitDelay) {
-                    mvStore.tryCommit();
+                long time = getTimeSinceCreation(); // mvStore 自创建以来的时间
+                if (time > lastCommitTime + autoCommitDelay) { // 当前相对时间 > 上次提交相对时间 + 延迟时间
+                    mvStore.tryCommit(); // 提交
                 }
                 doHousekeeping(mvStore);
                 // less than 10 I/O operations will still count as "idle"
@@ -2223,7 +2223,7 @@ public abstract class FileStore<C extends Chunk<C>>
         }
     }
 
-    /**
+    /** 自动存储变更
      * A background writer thread to automatically store changes from time to
      * time.
      */
@@ -2242,16 +2242,16 @@ public abstract class FileStore<C extends Chunk<C>>
 
         @Override
         public void run() {
-            while (store.isBackgroundThread()) {
-                synchronized (sync) {
+            while (store.isBackgroundThread()) { // mvStore 里的 后台线程就是当前线程
+                synchronized (sync) { // 加锁
                     try {
-                        sync.wait(sleep);
+                        sync.wait(sleep); // 先 sleep 指定时间
                     } catch (InterruptedException ignore) {/**/}
                 }
-                if (!store.isBackgroundThread()) {
+                if (!store.isBackgroundThread()) { // 再次判断 mvStore 里的 后台线程就是当前线程
                     break;
                 }
-                store.writeInBackground();
+                store.writeInBackground(); // 存储变更
             }
         }
     }

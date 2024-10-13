@@ -1077,7 +1077,7 @@ public class MVMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V
      * @return true if has changes
      */
     final boolean hasChangesSince(long version) {
-        return getRoot().hasChangesSince(version, isPersistent());
+        return getRoot().hasChangesSince(version, isPersistent()); // 根节点是否有变更
     }
 
     /**
