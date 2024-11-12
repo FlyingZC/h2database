@@ -187,7 +187,7 @@ public abstract class Command implements CommandInterface {
         boolean callStop = true;
         session.lock();
         try {
-            session.startStatementWithinTransaction(this);
+            session.startStatementWithinTransaction(this); // 事务内开启 statement
             Session oldSession = session.setThreadLocalSession();
             try {
                 while (true) {

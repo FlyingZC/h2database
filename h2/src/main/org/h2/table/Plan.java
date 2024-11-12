@@ -33,13 +33,13 @@ public class Plan {
      * @param count the number of table items
      * @param condition the condition in the WHERE clause
      */
-    public Plan(TableFilter[] filters, int count, Expression condition) {
+    public Plan(TableFilter[] filters, int count, Expression condition) { // 表; 表数量; 查询条件
         this.filters = new TableFilter[count];
         System.arraycopy(filters, 0, this.filters, 0, count);
         final ArrayList<Expression> allCond = new ArrayList<>();
         final ArrayList<TableFilter> all = new ArrayList<>();
         if (condition != null) {
-            allCond.add(condition);
+            allCond.add(condition); // where 查询条件
         }
         for (int i = 0; i < count; i++) {
             TableFilter f = filters[i];
@@ -93,7 +93,7 @@ public class Plan {
         }
     }
 
-    /**
+    /** 计算查询计划的成本
      * Calculate the cost of this query plan.
      *
      * @param session the session
@@ -105,39 +105,39 @@ public class Plan {
         if (t.isDebugEnabled()) {
             t.debug("Plan       : calculate cost for plan {0}", Arrays.toString(allFilters));
         }
-        double cost = 1;
+        double cost = 1; // 初始化成本为1，作为后续成本累乘的基础值
         boolean invalidPlan = false;
-        for (int i = 0; i < allFilters.length; i++) {
+        for (int i = 0; i < allFilters.length; i++) { // 遍历所有的表过滤器来计算总成本
             TableFilter tableFilter = allFilters[i];
             if (t.isDebugEnabled()) {
                 t.debug("Plan       :   for table filter {0}", tableFilter);
             }
-            PlanItem item = tableFilter.getBestPlanItem(session, allFilters, i, allColumnsSet);
+            PlanItem item = tableFilter.getBestPlanItem(session, allFilters, i, allColumnsSet); // 获取最佳的计划项
             planItems.put(tableFilter, item);
             if (t.isDebugEnabled()) {
                 t.debug("Plan       :   best plan item cost {0} index {1}",
                         item.cost, item.getIndex().getPlanSQL());
             }
-            cost += cost * item.cost;
-            setEvaluatable(tableFilter, true);
+            cost += cost * item.cost; // 更新总成本
+            setEvaluatable(tableFilter, true); // 设置表过滤器为可评估状态
             Expression on = tableFilter.getJoinCondition();
             if (on != null) {
-                if (!on.isEverything(ExpressionVisitor.EVALUATABLE_VISITOR)) {
+                if (!on.isEverything(ExpressionVisitor.EVALUATABLE_VISITOR)) { // 检查连接条件是否可评估
                     invalidPlan = true;
                     break;
                 }
             }
         }
-        if (invalidPlan) {
+        if (invalidPlan) { // 如果计划无效，则设置成本为无穷大
             cost = Double.POSITIVE_INFINITY;
         }
         if (t.isDebugEnabled()) {
             session.getTrace().debug("Plan       : plan cost {0}", cost);
         }
-        for (TableFilter f : allFilters) {
+        for (TableFilter f : allFilters) { // 将所有表过滤器重置为不可评估状态
             setEvaluatable(f, false);
         }
-        return cost;
+        return cost; // 返回最终计算的成本
     }
 
     private void setEvaluatable(TableFilter filter, boolean b) {

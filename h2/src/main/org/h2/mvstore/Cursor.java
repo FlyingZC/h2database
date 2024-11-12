@@ -37,7 +37,7 @@ public final class Cursor<K,V> implements Iterator<K> {
      */
     public Cursor(RootReference<K,V> rootReference, K from, K to, boolean reverse) {
         this.lastPage = rootReference.root;
-        this.cursorPos = traverseDown(lastPage, from, reverse);
+        this.cursorPos = traverseDown(lastPage, from, reverse); // 默认是根节点的 0 index
         this.to = to;
         this.reverse = reverse;
     }
@@ -46,21 +46,21 @@ public final class Cursor<K,V> implements Iterator<K> {
     public boolean hasNext() {
         if (cursorPos != null) {
             int increment = reverse ? -1 : 1;
-            while (current == null) {
-                Page<K,V> page = cursorPos.page;
-                int index = cursorPos.index;
+            while (current == null) { // 循环
+                Page<K,V> page = cursorPos.page; // 当前页面
+                int index = cursorPos.index; // 从 pos 里获取当前 index
                 if (reverse ? index < 0 : index >= upperBound(page)) { // 判断是否到达当前page的边界
                     // traversal of this page is over, going up a level or stop if at the root already
                     CursorPos<K,V> tmp = cursorPos;
-                    cursorPos = cursorPos.parent;
-                    if (cursorPos == null) {
+                    cursorPos = cursorPos.parent; // 如果 index 达到当前页的边界，则向上回溯到父节点
+                    if (cursorPos == null) { // 检查是否已到根节点，如果是则返回 false
                         return false;
                     }
                     tmp.parent = keeper;
                     keeper = tmp;
                 } else {
                     // traverse down to the leaf taking the leftmost path
-                    while (!page.isLeaf()) {
+                    while (!page.isLeaf()) { // 如果当前页不是叶子节点，则向下遍历到叶子节点
                         page = page.getChildPage(index);
                         index = reverse ? upperBound(page) - 1 : 0;
                         if (keeper == null) {
@@ -75,16 +75,16 @@ public final class Cursor<K,V> implements Iterator<K> {
                         }
                     }
                     if (reverse ? index >= 0 : index < page.getKeyCount()) {
-                        K key = page.getKey(index);
+                        K key = page.getKey(index); // 获取当前 page 指定 index 里存储的 key
                         if (to != null && Integer.signum(page.map.getKeyType().compare(key, to)) == increment) {
                             return false;
                         }
                         current = last = key;
-                        lastValue = page.getValue(index);
+                        lastValue = page.getValue(index); // 根据 key 获取 value
                         lastPage = page;
                     }
                 }
-                cursorPos.index += increment;
+                cursorPos.index += increment; // 增加 index, 移动到下一个位置
             }
         }
         return current != null;
@@ -180,6 +180,6 @@ public final class Cursor<K,V> implements Iterator<K> {
     }
 
     private static <K,V> int upperBound(Page<K,V> page) {
-        return page.isLeaf() ? page.getKeyCount() : page.map.getChildPageCount(page);
+        return page.isLeaf() ? page.getKeyCount() : page.map.getChildPageCount(page); // 获取当前页的 key 数量
     }
 }

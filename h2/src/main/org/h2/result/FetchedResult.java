@@ -31,7 +31,7 @@ public abstract class FetchedResult implements ResultInterface {
 
     @Override
     public final boolean next() {
-        if (hasNext()) {
+        if (hasNext()) { // 判断是否有下一条记录
             rowId++;
             currentRow = nextRow;
             nextRow = null;

@@ -853,32 +853,32 @@ public abstract class Table extends SchemaObject {
     public PlanItem getBestPlanItem(SessionLocal session, int[] masks,
             TableFilter[] filters, int filter, SortOrder sortOrder,
             AllColumnsForPlan allColumnsSet) {
-        PlanItem item = new PlanItem();
+        PlanItem item = new PlanItem(); // 初始化一个 PlanItem 对象来存储最佳计划
         item.setIndex(getScanIndex(session));
-        item.cost = item.getIndex().getCost(session, null, filters, filter, null, allColumnsSet);
+        item.cost = item.getIndex().getCost(session, null, filters, filter, null, allColumnsSet); // 计算初始计划项的成本
         Trace t = session.getTrace();
         if (t.isDebugEnabled()) {
             t.debug("Table      :     potential plan item cost {0} index {1}",
                     item.cost, item.getIndex().getPlanSQL());
         }
-        ArrayList<Index> indexes = getIndexes();
-        IndexHints indexHints = getIndexHints(filters, filter);
+        ArrayList<Index> indexes = getIndexes(); // 获取所有候选索引
+        IndexHints indexHints = getIndexHints(filters, filter); // 根据当前查询上下文获取索引 hint 提示
 
-        if (indexes != null && masks != null) {
-            for (int i = 1, size = indexes.size(); i < size; i++) {
+        if (indexes != null && masks != null) { // 如果存在候选索引且掩码不为空，开始评估每个索引
+            for (int i = 1, size = indexes.size(); i < size; i++) { // 遍历所有索引
                 Index index = indexes.get(i);
 
-                if (isIndexExcludedByHints(indexHints, index)) {
+                if (isIndexExcludedByHints(indexHints, index)) { // 跳过被索引 hint 提示排除的索引
                     continue;
                 }
 
                 double cost = index.getCost(session, masks, filters, filter,
-                        sortOrder, allColumnsSet);
+                        sortOrder, allColumnsSet); // 计算当前索引的成本(不同索引有不同索引的计算公式)
                 if (t.isDebugEnabled()) {
                     t.debug("Table      :     potential plan item cost {0} index {1}",
                             cost, index.getPlanSQL());
                 }
-                if (cost < item.cost) {
+                if (cost < item.cost) { // 如果当前索引的成本低于当前最佳计划项的成本，更新最佳计划项
                     item.cost = cost;
                     item.setIndex(index);
                 }

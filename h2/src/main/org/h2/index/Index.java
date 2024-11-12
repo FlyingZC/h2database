@@ -541,7 +541,7 @@ public abstract class Index extends SchemaObject {
         return builder;
     }
 
-    /**
+    /** 计算使用特定索引进行查询操作的成本.成本计算考虑了多种因素，包括索引条件、排序成本以及是否需要额外读取数据.
      * Calculate the cost for the given mask as if this index was a typical
      * b-tree range index. This is the estimated cost required to search one
      * row, and then iterate over the given number of rows.
@@ -558,9 +558,9 @@ public abstract class Index extends SchemaObject {
      */
     protected final long getCostRangeIndex(int[] masks, long rowCount, TableFilter[] filters, int filter,
             SortOrder sortOrder, boolean isScanIndex, AllColumnsForPlan allColumnsSet) {
-        rowCount += Constants.COST_ROW_OFFSET;
+        rowCount += Constants.COST_ROW_OFFSET; // 索引成本偏移
         int totalSelectivity = 0;
-        long rowsCost = rowCount;
+        long rowsCost = rowCount; // 初始化成本为-索引记录数
         if (masks != null) {
             int i = 0, len = columns.length;
             boolean tryAdditional = false;
@@ -685,8 +685,8 @@ public abstract class Index extends SchemaObject {
             needsToReadFromScanIndex = true;
         }
         long rc;
-        if (isScanIndex) {
-            rc = rowsCost + sortingCost + 20;
+        if (isScanIndex) { // 如果是扫描索引
+            rc = rowsCost + sortingCost + 20; // 增加基本成本
         } else if (needsToReadFromScanIndex) {
             rc = rowsCost + rowsCost + sortingCost + 20;
         } else {
@@ -697,7 +697,7 @@ public abstract class Index extends SchemaObject {
             // blocks.
             rc = rowsCost + sortingCost + columns.length;
         }
-        return rc;
+        return rc; // 返回成本
     }
 
 

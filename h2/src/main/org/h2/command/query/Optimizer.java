@@ -177,10 +177,10 @@ class Optimizer {
         }
     }
 
-    private boolean testPlan(TableFilter[] list) {
-        Plan p = new Plan(list, list.length, condition);
-        double costNow = p.calculateCost(session, allColumnsSet);
-        if (cost < 0 || costNow < cost) {
+    private boolean testPlan(TableFilter[] list) { // 测试并更新最优计划
+        Plan p = new Plan(list, list.length, condition); // 创建一个计划
+        double costNow = p.calculateCost(session, allColumnsSet); // 计算计划成本
+        if (cost < 0 || costNow < cost) { // 更新最优计划
             cost = costNow;
             bestPlan = p;
             return true;
@@ -228,7 +228,7 @@ class Optimizer {
         return true;
     }
 
-    /**
+    /** 计算最佳查询计划.
      * Calculate the best query plan to use.
      *
      * @param parse If we do not need to really get the best plan because it is
@@ -238,20 +238,20 @@ class Optimizer {
         if (parse) {
             calculateFakePlan();
         } else {
-            calculateBestPlan();
+            calculateBestPlan(); // 计算最佳查询计划.
             bestPlan.removeUnusableIndexConditions();
         }
-        TableFilter[] f2 = bestPlan.getFilters();
-        topFilter = f2[0];
+        TableFilter[] f2 = bestPlan.getFilters(); // 获取 best plan 里的 filters
+        topFilter = f2[0]; // 设置 top filter
         for (int i = 0; i < f2.length - 1; i++) {
-            f2[i].addJoin(f2[i + 1], false, null);
+            f2[i].addJoin(f2[i + 1], false, null); // 添加 join table
         }
         if (parse) {
             return;
         }
         for (TableFilter f : f2) {
-            PlanItem item = bestPlan.getItem(f);
-            f.setPlanItem(item);
+            PlanItem item = bestPlan.getItem(f); // 获取 plan item
+            f.setPlanItem(item); // 设置 plan item
         }
     }
 

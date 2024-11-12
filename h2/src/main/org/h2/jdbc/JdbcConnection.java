@@ -436,10 +436,10 @@ public class JdbcConnection extends TraceObject implements Connection, CastDataP
             final Session session = this.session;
             session.lock();
             try {
-                if (autoCommit && !session.getAutoCommit()) {
-                    commit();
+                if (autoCommit && !session.getAutoCommit()) { // 要设置成自动提交, 当前 session 是非自动提交
+                    commit(); // 提交当前事务
                 }
-                session.setAutoCommit(autoCommit);
+                session.setAutoCommit(autoCommit); // 只是设置标记
             } finally {
                 session.unlock();
             }

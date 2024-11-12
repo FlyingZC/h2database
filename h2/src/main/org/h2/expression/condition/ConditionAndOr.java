@@ -103,10 +103,10 @@ public class ConditionAndOr extends Condition {
 
     @Override
     public Value getValue(SessionLocal session) {
-        Value l = left.getValue(session);
+        Value l = left.getValue(session); // 左边是否满足条件
         Value r;
         switch (andOrType) {
-        case AND: {
+        case AND: { // 连接条件是 and
             if (l.isFalse() || (r = right.getValue(session)).isFalse()) {
                 return ValueBoolean.FALSE;
             }
@@ -115,7 +115,7 @@ public class ConditionAndOr extends Condition {
             }
             return ValueBoolean.TRUE;
         }
-        case OR: {
+        case OR: { // 连接条件是 or
             if (l.isTrue() || (r = right.getValue(session)).isTrue()) {
                 return ValueBoolean.TRUE;
             }

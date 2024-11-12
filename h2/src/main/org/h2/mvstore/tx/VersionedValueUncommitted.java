@@ -13,8 +13,8 @@ import org.h2.value.VersionedValue;
  * @author <a href='mailto:andrei.tokar@gmail.com'>Andrei Tokar</a>
  */
 class VersionedValueUncommitted<T> extends VersionedValueCommitted<T> {
-    private final long operationId;
-    private final T committedValue;
+    private final long operationId; // 操作当前值的 transaction id + log id
+    private final T committedValue; // 已经提交的值(未提交时为空)
 
     private VersionedValueUncommitted(long operationId, T value, T committedValue) {
         super(value); // 当前值

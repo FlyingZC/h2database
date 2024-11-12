@@ -24,7 +24,7 @@ final class Record<K,V> {
     // -1 is a bogus map id
     static final Record<?,?> COMMIT_MARKER = new Record<>(-1, null, null);
 
-    /** 当前 undoLog 操作关联的 map id.
+    /** 当前 undoLog 操作关联的 map id(比如表).
      * Map id for this change is related to
      */
     final int mapId;

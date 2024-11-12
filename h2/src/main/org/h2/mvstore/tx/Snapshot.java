@@ -9,17 +9,17 @@ import java.util.BitSet;
 
 import org.h2.mvstore.RootReference;
 
-/**
+/** 快照.包含 map 的根节点引用 和 正在提交的事务集合.
  * Snapshot of the map root and committing transactions.
  */
 final class Snapshot<K,V> {
 
-    /**
+    /** mvMap 根节点引用.
      * The root reference.
      */
     final RootReference<K,V> root;
 
-    /**
+    /** 提交中的事务.
      * The committing transactions (see also TransactionStore.committingTransactions).
      */
     final BitSet committingTransactions;

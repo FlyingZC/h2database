@@ -41,7 +41,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
 
     private final MVTable mvTable;
     private final String mapName;
-    private final TransactionMap<Long, SearchRow> dataMap;
+    private final TransactionMap<Long, SearchRow> dataMap; // 主键id -> row
     private final AtomicLong lastKey = new AtomicLong();
     private int mainIndexColumn = SearchRow.ROWID_INDEX;
 
@@ -230,7 +230,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
     }
 
     @Override
-    public Cursor find(SessionLocal session, SearchRow first, SearchRow last, boolean reverse) {
+    public Cursor find(SessionLocal session, SearchRow first, SearchRow last, boolean reverse) { // 在索引中查找指定范围内的行
         Long min, max;
         Value v;
         if (first == null) {
@@ -319,7 +319,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
                 max = v.getLong();
             }
         }
-        TransactionMap<Long,SearchRow> map = getMap(session);
+        TransactionMap<Long,SearchRow> map = getMap(session); // 获取当前 session 的 transaction map, 没有则创建
         if (min != null && max != null && min.longValue() == max.longValue()) {
             return new SingleRowCursor(setRowKey((Row) map.getFromSnapshot(min), min));
         }
@@ -496,7 +496,7 @@ public class MVPrimaryIndex extends MVIndex<Long, SearchRow> {
 
         @Override
         public boolean next() {
-            current = it.fetchNext();
+            current = it.fetchNext(); // 获取下一行
             row = null;
             return current != null;
         }

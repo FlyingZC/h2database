@@ -169,7 +169,7 @@ public class Constants {
      */
     public static final String CONN_URL_INTERNAL = "jdbc:default:connection";
 
-    /**
+    /** 成本是根据行计数 + 此偏移量计算的，以避免在表_当前_不包含行时使用错误或不使用索引（准备语句时）
      * The cost is calculated on rowcount + this offset,
      * to avoid using the wrong or no index if the table
      * contains no rows _currently_ (when preparing the statement)

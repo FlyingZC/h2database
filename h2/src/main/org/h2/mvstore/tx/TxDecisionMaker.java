@@ -330,7 +330,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
         }
 
         private V getValueInSnapshot() {
-            return allowNonRepeatableRead() ? null : oldValueSupplier.apply(key); // 是否允许不可重复读(RC 和以下)
+            return allowNonRepeatableRead() ? null : oldValueSupplier.apply(key); // 是否允许不可重复读(RC 和以下).1.若不允许可重复读(RR & Serializable),返回快照值为null.2.否则返回快照值
         }
     }
 

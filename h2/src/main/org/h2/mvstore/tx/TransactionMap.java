@@ -47,24 +47,24 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      */
     public final MVMap<K, VersionedValue<V>> map;
 
-    /**
+    /** 当前 map 关联的事务
      * The transaction which is used for this map.
      */
     private final Transaction transaction;
 
-    /**
+    /** 根据隔离级别可能是事务开启时的快照，或者事务执行 statement 时候的快照.
      * Snapshot of this map as of beginning of transaction or
      * first usage within transaction or
      * beginning of the statement, depending on isolation level
      */
     private Snapshot<K,VersionedValue<V>> snapshot;
 
-    /**
+    /** 开始执行 statement 时候的快照.
      * Snapshot of this map as of beginning of beginning of the statement
      */
     private Snapshot<K,VersionedValue<V>> statementSnapshot;
 
-    /**
+    /** map数据是否被当前事务修改过
      * Indicates whether underlying map was modified from within related transaction
      */
     private boolean hasChanges;
@@ -79,7 +79,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         this.map = map;
         this.txDecisionMaker = new TxDecisionMaker<>(map.getId(), transaction);
         this.ifAbsentDecisionMaker = new TxDecisionMaker.PutIfAbsentDecisionMaker<>(map.getId(),
-                transaction, this::getFromSnapshot);
+                transaction, this::getFromSnapshot); // 根据 snapshot 创建 ifAbsentDecisionMaker
         this.lockDecisionMaker = transaction.allowNonRepeatableRead()
                 ? new TxDecisionMaker.LockDecisionMaker<>(map.getId(), transaction)
                 : new TxDecisionMaker.RepeatableReadLockDecisionMaker<>(map.getId(), transaction,
@@ -275,7 +275,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      * @return the old value
      */
     @Override
-    public V putIfAbsent(K key, V value) {
+    public V putIfAbsent(K key, V value) { // 重写 map 的 putIfAbsent 方法
         DataUtils.checkArgument(value != null, "The value may not be null");
         ifAbsentDecisionMaker.initialize(key, value); // 1.初始化 decision maker
         V result = set(key, ifAbsentDecisionMaker, -1); // 2.设置值到 transaction map
@@ -459,7 +459,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      */
     public V getFromSnapshot(K key) {
         switch (transaction.isolationLevel) {
-        case READ_UNCOMMITTED: {
+        case READ_UNCOMMITTED: { // 直接从语句快照中获取值
             Snapshot<K,VersionedValue<V>> snapshot = getStatementSnapshot();
             VersionedValue<V> data = map.get(snapshot.root.root, key);
             if (data != null) {
@@ -470,7 +470,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         case REPEATABLE_READ:
         case SNAPSHOT:
         case SERIALIZABLE:
-            if (transaction.hasChanges()) {
+            if (transaction.hasChanges()) { // RR 检查当前事务是否有更改.如果有更改，从语句快照中获取值
                 Snapshot<K,VersionedValue<V>> snapshot = getStatementSnapshot();
                 VersionedValue<V> data = map.get(snapshot.root.root, key);
                 if (data != null) {
@@ -483,8 +483,8 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
             //$FALL-THROUGH$
         case READ_COMMITTED:
         default:
-            Snapshot<K,VersionedValue<V>> snapshot = getSnapshot();
-            return getFromSnapshot(snapshot.root, snapshot.committingTransactions, key);
+            Snapshot<K,VersionedValue<V>> snapshot = getSnapshot(); // 获取 snapshot
+            return getFromSnapshot(snapshot.root, snapshot.committingTransactions, key); // 获取 snapshot 中的数据
         }
     }
 
@@ -561,14 +561,14 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         // which they had at some recent moment in time.
         // In order to get such a "snapshot", we wait for a moment of silence,
         // when neither of the variables concurrently changes it's value.
-        AtomicReference<BitSet> holder = transaction.store.committingTransactions;
-        BitSet committingTransactions = holder.get();
-        while (true) {
-            BitSet prevCommittingTransactions = committingTransactions;
-            RootReference<K,VersionedValue<V>> root = map.getRoot();
-            committingTransactions = holder.get();
-            if (committingTransactions == prevCommittingTransactions) {
-                return snapshotConsumer.apply(root, committingTransactions);
+        AtomicReference<BitSet> holder = transaction.store.committingTransactions; // 获取当前正在提交的事务集合 committingTransactions
+        BitSet committingTransactions = holder.get(); // 第一次通过 holder 获取
+        while (true) { // 如果 committingTransactions 发生变化，继续循环
+            BitSet prevCommittingTransactions = committingTransactions; // 重新获取当前正在提交的事务集合
+            RootReference<K,VersionedValue<V>> root = map.getRoot(); // 获取 map 的根引用 root
+            committingTransactions = holder.get(); // 事实通过 holder 获取
+            if (committingTransactions == prevCommittingTransactions) { // 检查两次获取的 committingTransactions 是否相同
+                return snapshotConsumer.apply(root, committingTransactions); // 如果 committingTransactions 没有变化 则应用快照
             }
         }
     }
@@ -887,13 +887,13 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
             case REPEATABLE_READ:
             case SNAPSHOT:
             case SERIALIZABLE:
-                if (hasChanges) {
+                if (hasChanges) { // 有修改
                     return new RepeatableIterator<>(this, from, to, reverse, forEntries);
                 }
                 //$FALL-THROUGH$
             case READ_COMMITTED:
             default:
-                return new CommittedIterator<>(this, from, to, reverse, forEntries);
+                return new CommittedIterator<>(this, from, to, reverse, forEntries); // RC 迭代器
         }
     }
 
@@ -981,8 +981,8 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
         @Override
         public X fetchNext() {
-            while (cursor.hasNext()) {
-                K key = cursor.next();
+            while (cursor.hasNext()) { // 获取下一行
+                K key = cursor.next(); // 获取当前数据
                 VersionedValue<?> data = cursor.getValue();
                 // If value doesn't exist or it was deleted by a committed transaction,
                 // or if value is a committed one, just return it.
@@ -1000,7 +1000,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
                             return toElement(key, committedValue);
                         }
                     }
-                    Object currentValue = data.getCurrentValue();
+                    Object currentValue = data.getCurrentValue(); // 获取当前值
                     if (currentValue != null) {
                         return toElement(key, currentValue);
                     }
@@ -1035,7 +1035,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
             super(transactionMap, from, to, transactionMap.getSnapshot(), reverse, forEntries);
             keyType = transactionMap.map.getKeyType();
             Snapshot<K,VersionedValue<V>> snapshot = transactionMap.getStatementSnapshot();
-            uncommittedCursor = transactionMap.map.cursor(snapshot.root, from, to, reverse);
+            uncommittedCursor = transactionMap.map.cursor(snapshot.root, from, to, reverse); // 创建 未提交数据游标(父类里还有一个 cursor)
         }
 
         @Override
@@ -1125,11 +1125,11 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         X current;
 
         TMIterator(TransactionMap<K, V> transactionMap, K from, K to, Snapshot<K, VersionedValue<V>> snapshot,
-                boolean reverse, boolean forEntries) {
+                boolean reverse, boolean forEntries) { // 创建迭代器
             Transaction transaction = transactionMap.getTransaction();
             this.transactionId = transaction.transactionId;
             this.forEntries = forEntries;
-            this.cursor = transactionMap.map.cursor(snapshot.root, from, to, reverse);
+            this.cursor = transactionMap.map.cursor(snapshot.root, from, to, reverse); // 通过快照的根节点创建 cursor
             this.committingTransactions = snapshot.committingTransactions;
         }
 

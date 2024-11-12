@@ -757,15 +757,15 @@ public class Select extends Query {
                 limitRows = Long.MAX_VALUE;
             }
         }
-        LazyResultQueryFlat lazyResult = new LazyResultQueryFlat(expressionArray, columnCount, forUpdate != null);
+        LazyResultQueryFlat lazyResult = new LazyResultQueryFlat(expressionArray, columnCount, forUpdate != null); // 创建一个LazyResultQueryFlat对象
         skipOffset(lazyResult, offset, quickOffset == QuickOffset.YES);
         if (result == null) {
             return lazyResult;
         }
         if (limitRows == Long.MAX_VALUE || limitRows < 0 || sort != null && indexSortedColumns == 0
                 || withTies && quickOffset == QuickOffset.NO) {
-            while (lazyResult.next()) {
-                result.addRow(lazyResult.currentRow());
+            while (lazyResult.next()) { // 获取下一行
+                result.addRow(lazyResult.currentRow()); // 添加行到结果集
             }
         } else {
             readWithLimit(result, limitRows, withTies, lazyResult);
@@ -834,7 +834,7 @@ public class Select extends Query {
         LocalResult result = null;
         if (!lazy && (target == null ||
                 !getDatabase().getSettings().optimizeInsertFromSelect)) {
-            result = createLocalResult(result);
+            result = createLocalResult(result); // 创建一个LocalResult对象
         }
         // Do not add rows before OFFSET to result if possible
         QuickOffset quickOffset = fetchPercent ? QuickOffset.NO : QuickOffset.YES;
@@ -864,7 +864,7 @@ public class Select extends Query {
         }
         topTableFilter.startQuery(session);
         topTableFilter.reset();
-        topTableFilter.lock(session);
+        topTableFilter.lock(session); // 加读锁
         ResultTarget to = result != null ? result : target;
         lazy &= to == null;
         LazyResult lazyResult = null;
@@ -888,7 +888,7 @@ public class Select extends Query {
             } else if (isDistinctQuery) {
                 queryDistinct(to, offset, limit, withTies, quickOffset == QuickOffset.YES);
             } else {
-                lazyResult = queryFlat(columnCount, to, offset, limit, withTies, quickOffset);
+                lazyResult = queryFlat(columnCount, to, offset, limit, withTies, quickOffset); // 执行查询
             }
             if (quickOffset == QuickOffset.YES) {
                 offset = 0;
@@ -1257,9 +1257,9 @@ public class Select extends Query {
                 }
             }
         }
-        cost = preparePlan(session.isParsingCreateView());
+        cost = preparePlan(session.isParsingCreateView()); // 计算执行计划的成本
         if (distinct && getDatabase().getSettings().optimizeDistinct && !isGroupQuery && filters.size() == 1
-                && expressions.size() == 1 && condition == null) {
+                && expressions.size() == 1 && condition == null) { // 优化DISTINCT查询
             Expression expr = expressions.get(0);
             expr = expr.getNonAliasExpression();
             if (expr instanceof ExpressionColumn) {
@@ -1276,7 +1276,7 @@ public class Select extends Query {
                 }
             }
         }
-        if (sort != null && !isQuickAggregateQuery && !isGroupQuery) {
+        if (sort != null && !isQuickAggregateQuery && !isGroupQuery) { // 排序优化
             List<IndexSort> sortIndexes = getIndexSorts();
             Index current = topTableFilter.getIndex();
             if (sortIndexes != null && current != null) {
@@ -1317,7 +1317,7 @@ public class Select extends Query {
                 indexSortedColumns = 0;
             }
         }
-        if (!isQuickAggregateQuery && isGroupQuery) {
+        if (!isQuickAggregateQuery && isGroupQuery) { // 分组查询优化
             Index index = getGroupSortedIndex();
             if (index != null) {
                 Index current = topTableFilter.getIndex();
@@ -1380,8 +1380,8 @@ public class Select extends Query {
             t.setFullCondition(condition);
         }
 
-        Optimizer optimizer = new Optimizer(topArray, condition, session);
-        optimizer.optimize(parse);
+        Optimizer optimizer = new Optimizer(topArray, condition, session); // 创建查询优化器
+        optimizer.optimize(parse); // 优化查询计划
         topTableFilter = optimizer.getTopFilter();
         double planCost = optimizer.getCost();
 
@@ -1745,7 +1745,7 @@ public class Select extends Query {
             break;
         }
         case ExpressionVisitor.GET_DEPENDENCIES: {
-            for (TableFilter f : filters) {
+            for (TableFilter f : filters) { // 涉及的表
                 Table table = f.getTable();
                 visitor.addDependency(table);
                 table.addDependencies(visitor.getDependencies());
@@ -1882,11 +1882,11 @@ public class Select extends Query {
         }
 
         @Override
-        protected Value[] fetchNextRow() {
-            while (topTableFilter.next()) {
+        protected Value[] fetchNextRow() { // 获取下一行数据
+            while (topTableFilter.next()) { // 通过 table filter 获取下一行数据
                 setCurrentRowNumber(rowNumber + 1);
                 // This method may lock rows
-                if (forUpdate ? isConditionMetForUpdate() : isConditionMet()) {
+                if (forUpdate ? isConditionMetForUpdate() : isConditionMet()) { // 按照查询条件过滤,看当前行是否满足查询条件,不满足的过滤掉
                     ++rowNumber;
                     Value[] row = new Value[columnCount];
                     for (int i = 0; i < columnCount; i++) {

@@ -699,7 +699,7 @@ public abstract class Page<K,V> implements Cloneable {
         return true;
     }
 
-    /**
+    /** 将当前页面序列化到指定的缓冲区
      * Serializes this page into provided buffer, which represents content of the specified
      * chunk to be persisted and updates the "position" of the page.
      *
@@ -717,20 +717,20 @@ public abstract class Page<K,V> implements Cloneable {
             .putShort((byte)0) // placeholder for check
             .putVarInt(pageNo)
             .putVarInt(map.getId())
-            .putVarInt(keyCount);
+            .putVarInt(keyCount); // 在缓冲区中预留空间
         int typePos = buff.position();
-        int type = isLeaf() ? PAGE_TYPE_LEAF : DataUtils.PAGE_TYPE_NODE;
-        buff.put((byte)type);
-        int childrenPos = buff.position();
-        writeChildren(buff, true);
-        int compressStart = buff.position();
-        map.getKeyType().write(buff, keys, keyCount);
-        writeValues(buff);
+        int type = isLeaf() ? PAGE_TYPE_LEAF : DataUtils.PAGE_TYPE_NODE; // 根据页面是否为叶子页，确定页面类型
+        buff.put((byte)type); // 将页面类型写入缓冲区
+        int childrenPos = buff.position(); // 记录子页面位置信息的起始位置
+        writeChildren(buff, true); // 写入子页面的位置信息
+        int compressStart = buff.position(); // 记录压缩开始的位置
+        map.getKeyType().write(buff, keys, keyCount); // 根据 key 的类型，写入 key 的信息
+        writeValues(buff); // 写入 value 的信息
         MVStore store = map.getStore();
-        int expLen = buff.position() - compressStart;
-        if (expLen > 16) {
-            int compressionLevel = store.getCompressionLevel();
-            if (compressionLevel > 0) {
+        int expLen = buff.position() - compressStart; // 计算预期的未压缩数据长度
+        if (expLen > 16) { // 如果数据长度超过16字节，则考虑进行压缩
+            int compressionLevel = store.getCompressionLevel(); // 获取存储对象的压缩级别
+            if (compressionLevel > 0) { // 根据压缩级别选择合适的压缩器和压缩类型
                 Compressor compressor;
                 int compressType;
                 if (compressionLevel == 1) {
@@ -740,44 +740,44 @@ public abstract class Page<K,V> implements Cloneable {
                     compressor = store.getCompressorHigh();
                     compressType = DataUtils.PAGE_COMPRESSED_HIGH;
                 }
-                byte[] comp = new byte[expLen * 2];
+                byte[] comp = new byte[expLen * 2]; // 准备压缩后的字节数组
                 ByteBuffer byteBuffer = buff.getBuffer();
                 int pos = 0;
                 byte[] exp;
-                if (byteBuffer.hasArray()) {
+                if (byteBuffer.hasArray()) { // 根据缓冲区的类型，获取待压缩的数据
                     exp = byteBuffer.array();
                     pos = byteBuffer.arrayOffset()  + compressStart;
                 } else {
                     exp = Utils.newBytes(expLen);
                     buff.position(compressStart).get(exp);
                 }
-                int compLen = compressor.compress(exp, pos, expLen, comp, 0);
-                int plus = DataUtils.getVarIntLen(expLen - compLen);
-                if (compLen + plus < expLen) {
+                int compLen = compressor.compress(exp, pos, expLen, comp, 0); // 执行压缩，并获取压缩后的长度
+                int plus = DataUtils.getVarIntLen(expLen - compLen); // 计算需要额外添加的长度，用于存储压缩后的数据长度
+                if (compLen + plus < expLen) { // 如果压缩后的数据长度加上额外长度小于未压缩的长度，则执行压缩
                     buff.position(typePos)
-                        .put((byte) (type | compressType));
+                        .put((byte) (type | compressType)); // 更新页面类型，标记为压缩
                     buff.position(compressStart)
                         .putVarInt(expLen - compLen)
-                        .put(comp, 0, compLen);
+                        .put(comp, 0, compLen); // 写入压缩后的数据长度和压缩数据
                 }
             }
         }
-        int pageLength = buff.position() - start;
-        long pagePos = pageSerializationManager.getPagePosition(getMapId(), start, pageLength, type);
-        if (isSaved()) {
+        int pageLength = buff.position() - start; // 计算并记录页面的实际长度
+        long pagePos = pageSerializationManager.getPagePosition(getMapId(), start, pageLength, type); // 根据MapID、页面长度和类型，获取页面在存储介质上的位置
+        if (isSaved()) { // 如果页面已经存储过，则抛出异常
             throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_INTERNAL, "Page already stored");
         }
-        boolean isDeleted = isRemoved();
-        while (!posUpdater.compareAndSet(this, isDeleted ? 1L : 0L, pagePos)) {
+        boolean isDeleted = isRemoved(); // 判断页面是否被删除
+        while (!posUpdater.compareAndSet(this, isDeleted ? 1L : 0L, pagePos)) { // 使用CAS操作更新页面的位置，直到更新成功
             isDeleted = isRemoved();
         }
-        int pageLengthDecoded = DataUtils.getPageMaxLength(pagePos);
+        int pageLengthDecoded = DataUtils.getPageMaxLength(pagePos); // 计算并记录页面占用的磁盘空间
         diskSpaceUsed = pageLengthDecoded != DataUtils.PAGE_LARGE ? pageLengthDecoded : pageLength;
         boolean singleWriter = map.isSingleWriter();
 
-        pageSerializationManager.onPageSerialized(this, isDeleted, pageLengthDecoded, singleWriter);
-        return childrenPos;
+        pageSerializationManager.onPageSerialized(this, isDeleted, pageLengthDecoded, singleWriter); // 调用序列化管理器的回调方法，通知页面已序列化完成
+        return childrenPos; // 返回子页面位置信息的起始位置
     }
 
     /**
@@ -1649,7 +1649,7 @@ public abstract class Page<K,V> implements Cloneable {
         @Override
         void writeUnsavedRecursive(PageSerializationManager pageSerializationManager) {
             if (!isSaved()) {
-                write(pageSerializationManager);
+                write(pageSerializationManager); // 写出未保存的 pages
             }
         }
 

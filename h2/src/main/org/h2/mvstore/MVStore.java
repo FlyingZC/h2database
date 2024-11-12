@@ -860,24 +860,24 @@ public final class MVStore implements AutoCloseable {
         for (Iterator<MVMap<?, ?>> iter = maps.values().iterator(); iter.hasNext(); ) { // 遍历 mvMaps
             MVMap<?, ?> map = iter.next();
             RootReference<?,?> rootReference = map.setWriteVersion(version);
-            if (rootReference == null) {
+            if (rootReference == null) { // 根节点
                 iter.remove();
             } else if (map.getCreateVersion() < version && // if map was created after storing started, skip it
                     !map.isVolatile() &&
-                    map.hasChangesSince(lastStoredVersion)) {
+                    map.hasChangesSince(lastStoredVersion)) { // 有变更
                 assert rootReference.version <= version : rootReference.version + " > " + version;
                 // simply checking rootPage.isSaved() won't work here because
                 // after deletion previously saved page
                 // may pop up as a root, but we still need
                 // to save new root pos in meta
-                changed.add(rootReference.root);
+                changed.add(rootReference.root); // 根节点添加到 变更列表
             }
         }
         RootReference<?,?> rootReference = meta.setWriteVersion(version);
-        if (meta.hasChangesSince(lastStoredVersion) || metaChanged) {
+        if (meta.hasChangesSince(lastStoredVersion) || metaChanged) { // 元数据有变更
             assert rootReference != null && rootReference.version <= version
                     : rootReference == null ? "null" : rootReference.version + " > " + version;
-            changed.add(rootReference.root);
+            changed.add(rootReference.root); // 添加到变更列表
         }
         return changed;
     }

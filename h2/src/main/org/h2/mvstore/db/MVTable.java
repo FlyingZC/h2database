@@ -515,7 +515,7 @@ public class MVTable extends TableBase {
         long savepoint = t.setSavepoint(); // 1.获取 savepoint id(undo log id),当插入失败时回滚
         try {
             for (Index index : indexes) { // 2.遍历索引
-                index.add(session, row); // 3.记录添加到索引,注意 mysql/h2 数据就是按照 primary key 索引维护的,所以插入数据的逻辑就在这里
+                index.add(session, row); // 3.记录添加到索引,注意 mysql/h2 数据就是按照 primary key 索引维护的,所以插入数据的逻辑就在这里 [内部先1.记录 undo log buffer;2.执行数据插入]
             }
         } catch (Throwable e) {
             try {

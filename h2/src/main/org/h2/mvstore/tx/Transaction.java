@@ -103,7 +103,7 @@ public final class Transaction {
      */
     final long sequenceNum;
 
-    /* 事务状态是一个原子复合字段：
+    /* 事务状态是一个原子复合字段：1.创建事务时初始化;2.事务内操作会递增logId;2.事务提交/回滚时修改事务状态 status
      * Transaction state is an atomic composite field:
      * bit  45      : flag whether transaction had rollback(s) 位 45：标记事务是否有回滚
      * bits 44-41   : status 位 44-41：状态位
@@ -165,7 +165,7 @@ public final class Transaction {
      */
     private RootReference<Long,Record<?,?>>[] undoLogRootReferences;
 
-    /** 事务 id -> transaction map.
+    /** mvMap id -> transaction map.
      * Map of transactional maps for this transaction
      */
     private final Map<Integer, TransactionMap<?,?>> transactionMaps = new HashMap<>();
@@ -182,7 +182,7 @@ public final class Transaction {
         this.store = store;
         this.transactionId = transactionId;
         this.sequenceNum = sequenceNum;
-        this.statusAndLogId = new AtomicLong(composeState(status, logId, false)); // 1. 创建 transaction status & log id
+        this.statusAndLogId = new AtomicLong(composeState(status, logId, false)); // 1. 创建 transaction status & log id(默认为0)
         this.name = name;
         setTimeoutMillis(timeoutMillis);
         this.ownerId = ownerId;
@@ -213,9 +213,9 @@ public final class Transaction {
      */
     private long setStatus(int status) {
         while (true) {
-            long currentState = statusAndLogId.get(); // 当前 state & logId
+            long currentState = statusAndLogId.get(); // 获取事务当前(创建事务时指定的) state & logId
             long logId = getLogId(currentState); // 获取当前 undo log id
-            int currentStatus = getStatus(currentState); // 1.获取当前状态
+            int currentStatus = getStatus(currentState); // 1.获取事务当前状态
             boolean valid;
             switch (status) { // 2.判断当前状态允许变更为目标状态,然后变更为目标状态
                 case STATUS_ROLLING_BACK:
@@ -253,7 +253,7 @@ public final class Transaction {
             }
             long newState = composeState(status, logId, hasRollback(currentState)); // 2.新状态(transaction status + undo log id)
             if (statusAndLogId.compareAndSet(currentState, newState)) { // 3.原子变更
-                return currentState; // 4.返回当前状态(修改之前的)
+                return currentState; // 4.返回当前状态(修改之前的 status&logId),也就是 logId 是最新的,状态是之前的
             }
         }
     }
@@ -340,15 +340,15 @@ public final class Transaction {
             // when no new transaction were committed / closed.
             BitSet committingTransactions;
             do {
-                committingTransactions = store.committingTransactions.get();
+                committingTransactions = store.committingTransactions.get(); // 获取当前正在提交的事务集合 committingTransactions
                 for (MVMap<Object,VersionedValue<Object>> map : maps) { // 为每个 mvMap 创建快照
-                    TransactionMap<?,?> txMap = openMapX(map);
-                    txMap.setStatementSnapshot(new Snapshot(map.flushAndGetRoot(), committingTransactions));
+                    TransactionMap<?,?> txMap = openMapX(map); // 通过 map 获取 or 创建对应的 transactionMap
+                    txMap.setStatementSnapshot(new Snapshot(map.flushAndGetRoot(), committingTransactions)); // 为每个 mvMap 创建快照,设置到对应的 transactionMap 里
                 }
                 if (isReadCommitted()) {
                     undoLogRootReferences = store.collectUndoLogRootReferences();
                 }
-            } while (committingTransactions != store.committingTransactions.get());
+            } while (committingTransactions != store.committingTransactions.get()); // 原子保证 committingTransactions 和现有 store 里的一致,是最新的
             // Now we have a snapshot, where each map RootReference point to state of the map,
             // undoLogRootReferences captures the state of undo logs
             // and committingTransactions mask tells us which of seemingly uncommitted changes
@@ -356,7 +356,7 @@ public final class Transaction {
             // Subsequent processing uses this snapshot info only.
             for (MVMap<Object,VersionedValue<Object>> map : maps) {
                 TransactionMap<?,?> txMap = openMapX(map);
-                txMap.promoteSnapshot();
+                txMap.promoteSnapshot(); // 将 statementSnapshot 赋值给 snapshot
             }
         }
     }
@@ -365,11 +365,11 @@ public final class Transaction {
      * Mark an exit from SQL statement execution within this transaction.
      */
     public void markStatementEnd() {
-        if (allowNonRepeatableRead()) {
-            releaseSnapshot();
+        if (allowNonRepeatableRead()) { // 检查隔离级别：如果当前事务的隔离级别允许不可重复读（READ_COMMITTED 或 READ_UNCOMMITTED）
+            releaseSnapshot(); // 则调用 releaseSnapshot 方法释放快照。
         }
-        for (TransactionMap<?, ?> transactionMap : transactionMaps.values()) {
-            transactionMap.setStatementSnapshot(null);
+        for (TransactionMap<?, ?> transactionMap : transactionMaps.values()) { // 清空事务快照：遍历所有事务映射（transactionMaps）
+            transactionMap.setStatementSnapshot(null); // 将每个映射的语句快照设置为 null
         }
     }
 
@@ -557,9 +557,9 @@ public final class Transaction {
         Throwable ex = null;
         int status = STATUS_OPEN;
         try {
-            long lastState = setStatus(STATUS_ROLLED_BACK); // 1.尝试设置事务状态为 ROLLED_BACK，并获取之前的事务状态
-            status = getStatus(lastState); // 2.根据之前的事务状态获取当前事务状态
-            long logId = getLogId(lastState); // 3.获取事务的日志 ID
+            long lastState = setStatus(STATUS_ROLLED_BACK); // 1.尝试设置事务状态为 ROLLED_BACK，并获取之前的事务的 state & logId (logId 最新，状态是之前的)
+            status = getStatus(lastState); // 2.获取之前的事务状态
+            long logId = getLogId(lastState); // 3.获取之前事务的 log id
             if (logId > 0) {
                 store.rollbackTo(this, logId, 0); // 4.如果日志 ID 有效，则执行回滚到指定的日志 ID (从当前事务最大的 log id 回滚到 0)
             }

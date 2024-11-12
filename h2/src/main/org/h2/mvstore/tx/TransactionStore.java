@@ -300,7 +300,7 @@ public class TransactionStore {
     private static final int LOG_ID_BITS = Transaction.LOG_ID_BITS; // log id 位数
     private static final long LOG_ID_MASK = (1L << LOG_ID_BITS) - 1;
 
-    /** 事务id 和 log id 计算 operation id. (operation id = transaction id + undo log id)
+    /** 事务id 和 log id 计算 operation id (undo log btree key). (operation id = transaction id + undo log id)
      * Combine the transaction id and the log id to an operation id.
      *
      * @param transactionId the transaction id
@@ -722,8 +722,8 @@ public class TransactionStore {
         MVMap<Long,Record<?,?>> undoLog = undoLogs[transactionId]; // 1.获取 transaction id 对应的 undo log
         RollbackDecisionMaker decisionMaker = new RollbackDecisionMaker(this, transactionId, toLogId, t.listener); // 2.rollback decision maker
         for (long logId = maxLogId - 1; logId >= toLogId; logId--) { // 3.遍历从 maxLogId 到 toLogId
-            Long undoKey = getOperationId(transactionId, logId); // 3.1.计算 undo log key
-            undoLog.operate(undoKey, null, decisionMaker); // 3.2.操作 undo log mvMap, 执行回滚操作
+            Long undoKey = getOperationId(transactionId, logId); // 3.1.计算 undo log key (transaction id + log id)
+            undoLog.operate(undoKey, null, decisionMaker); // 3.2.根据 undo log key 操作 undo log mvMap, 执行回滚操作
             decisionMaker.reset();
         }
     }

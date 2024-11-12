@@ -185,7 +185,7 @@ public abstract class FileStore<C extends Chunk<C>>
      */
     private long creationTime;
 
-
+    // write buffer 池子
     private final Queue<WriteBuffer> writeBufferPool = new ArrayBlockingQueue<>(PIPE_LENGTH + 1);
 
     /** layout map。包含所有 map 的块元数据和根位置。  这是元数据变化相对较快的部分
@@ -760,8 +760,8 @@ public abstract class FileStore<C extends Chunk<C>>
     }
 
     private C createChunk(long time, long version) {
-        int newChunkId = findNewChunkId();
-        C c = createChunk(newChunkId);
+        int newChunkId = findNewChunkId(); // 获取新的 chunk id
+        C c = createChunk(newChunkId); // 创建新的 chunk 对象
         c.time = time;
         c.version = version;
         c.occupancy = new BitSet();
@@ -784,7 +784,7 @@ public abstract class FileStore<C extends Chunk<C>>
     private int findNewChunkId() {
         int newChunkId;
         while (true) {
-            newChunkId = ++lastChunkId & Chunk.MAX_ID;
+            newChunkId = ++lastChunkId & Chunk.MAX_ID; // 创建 新的 chunk id
             if (newChunkId == lastChunkId) {
                 break;
             }
@@ -1423,7 +1423,7 @@ public abstract class FileStore<C extends Chunk<C>>
             WriteBuffer buff;
             try {
                 c = createChunk(time, version); // 2.根据持久化版本号, 创建新的 chunk
-                buff = getWriteBuffer();
+                buff = getWriteBuffer(); // 获取缓存的 write buffer
                 serializeToBuffer(buff, changed, c, lastChunk); // 3.将变更的 pages 序列化到 buffer
                 chunks.put(c.id, c); // 4.缓存新的 chunk
             } catch (Throwable t) {
@@ -1449,7 +1449,7 @@ public abstract class FileStore<C extends Chunk<C>>
     private void serializeToBuffer(WriteBuffer buff, ArrayList<Page<?, ?>> changed, C c, C previousChunk) { // 将修改后的 page 序列化到 buffer
         // need to patch the header later
         int headerLength = c.estimateHeaderSize(); // 预留头部长度，待会填充
-        buff.position(headerLength);
+        buff.position(headerLength); // 移动 position
         c.next = headerLength;
 
         long version = c.version;
@@ -1459,7 +1459,7 @@ public abstract class FileStore<C extends Chunk<C>>
             if (p.getTotalCount() == 0) {
                 layout.remove(key);
             } else {
-                p.writeUnsavedRecursive(pageSerializationManager);
+                p.writeUnsavedRecursive(pageSerializationManager); // 循环写出未保存的当前 page
                 long root = p.getPos();
                 layout.put(key, Long.toHexString(root));
             }

@@ -44,11 +44,11 @@ final class RollbackDecisionMaker extends MVMap.DecisionMaker<Record<?,?>> {
                     TransactionStore.getTransactionId(operationId) == transactionId
                             && TransactionStore.getLogId(operationId) < toLogId) {
                 int mapId = existingValue.mapId; // 2.当前值对应的 map id
-                MVMap<Object, VersionedValue<Object>> map = store.openMap(mapId); // 3.获取对应 mvMap
+                MVMap<Object, VersionedValue<Object>> map = store.openMap(mapId); // 3.获取对应 mvMap(比如 primary key mvMap)
                 if (map != null && !map.isClosed()) {
-                    Object key = existingValue.key;
+                    Object key = existingValue.key; // 行 key
                     VersionedValue<Object> previousValue = map.operate(key, valueToRestore,
-                            MVMap.DecisionMaker.DEFAULT); // 4.从 mvMap 上移除 VersionedValueUncommitted
+                            MVMap.DecisionMaker.DEFAULT); // 4.从 mvMap(比如 primary key mvMap) 上移除 VersionedValueUncommitted,还原成旧值 valueToRestore(如果旧值为空则会移除,对应 insert 操作)
                     listener.onRollback(map, key, previousValue, valueToRestore);
                 }
             }

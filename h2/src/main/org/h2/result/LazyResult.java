@@ -75,7 +75,7 @@ public abstract class LazyResult extends FetchedResult {
             return false;
         }
         if (nextRow == null && (limit <= 0 || rowId + 1 < limit)) {
-            nextRow = fetchNextRow();
+            nextRow = fetchNextRow(); // 获取下一行
         }
         return nextRow != null;
     }

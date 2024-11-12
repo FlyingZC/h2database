@@ -860,7 +860,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
      */
     public Savepoint setSavepoint() {
         Savepoint sp = new Savepoint(); // 1.创建 savepoint
-        sp.transactionSavepoint = getStatementSavepoint(); // 2.获取当前statement对应的savepoint id(undo log id)
+        sp.transactionSavepoint = getStatementSavepoint(); // 2.获取当前 statement 对应的 savepoint id(undo log id)
         return sp;
     }
 
@@ -1622,7 +1622,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
 
     private long getStatementSavepoint() {
         if (startStatement == -1) {
-            startStatement = getTransaction().setSavepoint(); // 1.获取事务;2.设置savepoint, savepoint id 是 undo log 的当前 log id
+            startStatement = getTransaction().setSavepoint(); // 1.获取事务;2.设置savepoint, savepoint id 是 undo log 的当前 log id(每个事务内从0开始)
         }
         return startStatement;
     }
@@ -1635,9 +1635,9 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
     public void startStatementWithinTransaction(Command command) {
         Transaction transaction = getTransaction(); // 1.获取当前事务
         if (transaction != null) {
-            HashSet<MVMap<Object,VersionedValue<Object>>> maps = new HashSet<>(); // 用于存储可能受影响的 MVMap 对象 TODO zc 作用何时不为空
+            HashSet<MVMap<Object,VersionedValue<Object>>> maps = new HashSet<>(); // 用于存储可能受影响的 MVMap 对象列表
             if (command != null) {
-                Set<DbObject> dependencies = command.getDependencies(); // 获取命令的所有依赖项
+                Set<DbObject> dependencies = command.getDependencies(); // 获取命令的所有依赖项(比如 mvTable, 比如查询操作里涉及的表.insert操作 dependencies 为空)
                 switch (transaction.getIsolationLevel()) { // 根据事务的隔离级别进行处理
                 case SNAPSHOT:
                 case SERIALIZABLE:
@@ -1654,7 +1654,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
                     //$FALL-THROUGH$
                 case READ_COMMITTED:
                 case READ_UNCOMMITTED:
-                    for (DbObject dependency : dependencies) { // 处理命令的依赖项，主要针对 MVTable 类型的依赖项
+                    for (DbObject dependency : dependencies) { // 处理命令的依赖项，主要针对 MVTable 类型的依赖项(查询操作会有)
                         if (dependency instanceof MVTable) {
                             addTableToDependencies((MVTable)dependency, maps);
                         }
@@ -1692,7 +1692,7 @@ public final class SessionLocal extends Session implements TransactionStore.Roll
         if (!processed.add(table)) {
             return;
         }
-        addTableToDependencies(table, maps);
+        addTableToDependencies(table, maps); // 添加 mvIndex 的 mvMap
         ArrayList<Constraint> constraints = table.getConstraints();
         if (constraints != null) {
             for (Constraint constraint : constraints) {

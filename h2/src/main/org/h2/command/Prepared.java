@@ -399,11 +399,11 @@ public abstract class Prepared {
      * @param rowNumber the row number
      */
     public void setCurrentRowNumber(long rowNumber) {
-        if ((++rowScanCount & 127) == 0) {
+        if ((++rowScanCount & 127) == 0) { // 每 128 次调用时，调用 checkCanceled 方法检查是否已取消
             checkCanceled();
         }
-        this.currentRowNumber = rowNumber;
-        setProgress();
+        this.currentRowNumber = rowNumber; // 设置当前行号
+        setProgress(); // 进度更
     }
 
     /**

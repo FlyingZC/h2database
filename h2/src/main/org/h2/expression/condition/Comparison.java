@@ -293,7 +293,7 @@ public final class Comparison extends Condition {
             }
             break;
         }
-        case BIGGER: {
+        case BIGGER: { // 大于
             int cmp = session.compareWithNull(l, r, false);
             if (cmp > 0) {
                 result = ValueBoolean.TRUE;

@@ -200,7 +200,7 @@ public class TableFilter implements ColumnResolver {
         }
     }
 
-    /**
+    /** 获取当前连接顺序的最佳计划项（索引，成本）.
      * Get the best plan item (index, cost) to use for the current join
      * order.
      *
@@ -217,22 +217,22 @@ public class TableFilter implements ColumnResolver {
         if (select != null) {
             sortOrder = select.getSortOrder();
         }
-        if (indexConditions.isEmpty()) {
+        if (indexConditions.isEmpty()) { // 如果索引条件为空，则创建新的计划项并计算其成本
             item1 = new PlanItem();
             item1.setIndex(table.getScanIndex(s, null, filters, filter,
-                    sortOrder, allColumnsSet));
+                    sortOrder, allColumnsSet)); // 默认返回主键索引
             item1.cost = item1.getIndex().getCost(s, null, filters, filter,
                     sortOrder, allColumnsSet);
         }
-        int len = table.getColumns().length;
-        int[] masks = new int[len];
-        for (IndexCondition condition : indexConditions) {
+        int len = table.getColumns().length; // 获取表里的列数量
+        int[] masks = new int[len]; // 创建列掩码数组,长度为列的数量
+        for (IndexCondition condition : indexConditions) { // 遍历所有索引条件，并根据条件设置列掩码
             if (condition.isEvaluatable()) {
                 if (condition.isAlwaysFalse()) {
                     masks = null;
                     break;
                 }
-                if (condition.isCompoundColumns()) {
+                if (condition.isCompoundColumns()) { // 条件是复合列，则设置所有列的掩码
                     // Set the op mask in case of compound columns as well.
                     Column[] columns = condition.getColumns();
                     for (int i = 0, n = columns.length; i < n; i++) {
@@ -243,32 +243,32 @@ public class TableFilter implements ColumnResolver {
                     }
                 }
                 else {
-                    int id = condition.getColumn().getColumnId();
+                    int id = condition.getColumn().getColumnId(); // 获取当前查询条件里的列的ID
                     if (id >= 0) {
-                        masks[id] |= condition.getMask(indexConditions);
+                        masks[id] |= condition.getMask(indexConditions); // 计算mask
                     }
                 }
             }
         }
-        PlanItem item = table.getBestPlanItem(s, masks, filters, filter, sortOrder, allColumnsSet);
+        PlanItem item = table.getBestPlanItem(s, masks, filters, filter, sortOrder, allColumnsSet); // 获取最佳计划项
         item.setMasks(masks);
         // The more index conditions, the earlier the table.
         // This is to ensure joins without indexes run quickly:
         // x (x.a=10); y (x.b=y.b) - see issue 113
-        item.cost -= item.cost * indexConditions.size() / 100 / (filter + 1);
+        item.cost -= item.cost * indexConditions.size() / 100 / (filter + 1); // 调整成本以确保没有索引的连接能够快速执行
 
         if (item1 != null && item1.cost < item.cost) {
             item = item1;
         }
 
-        if (nestedJoin != null) {
+        if (nestedJoin != null) { // 如果存在嵌套连接，则获取嵌套连接的最佳计划项并调整成本
             setEvaluatable(true);
             item.setNestedJoinPlan(nestedJoin.getBestPlanItem(s, filters, filter, allColumnsSet));
             // TODO optimizer: calculate cost of a join: should use separate
             // expected row number and lookup cost
             item.cost += item.cost * item.getNestedJoinPlan().cost;
         }
-        if (join != null) {
+        if (join != null) { // 如果存在连接，则获取连接的最佳计划项并调整成本
             setEvaluatable(true);
             do {
                 filter++;
@@ -443,7 +443,7 @@ public class TableFilter implements ColumnResolver {
         if (state == AFTER_LAST) {
             return false;
         } else if (state == BEFORE_FIRST) {
-            cursor.find(session, indexConditions);
+            cursor.find(session, indexConditions); // 通过 index cursor 获取下一行数据
             if (!cursor.isAlwaysFalse()) {
                 if (nestedJoin != null) {
                     nestedJoin.reset();
@@ -459,7 +459,7 @@ public class TableFilter implements ColumnResolver {
                 return true;
             }
         }
-        while (true) {
+        while (true) { // 一直循环
             // go to the next row
             if (state == NULL_ROW) {
                 break;
@@ -474,7 +474,7 @@ public class TableFilter implements ColumnResolver {
                 if ((++scanCount & 4095) == 0) {
                     checkTimeout();
                 }
-                if (cursor.next()) {
+                if (cursor.next()) { // 有下一行
                     currentSearchRow = cursor.getSearchRow();
                     current = null;
                     state = FOUND;

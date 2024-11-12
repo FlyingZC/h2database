@@ -242,7 +242,7 @@ public class JdbcStatement extends TraceObject implements Statement {
         checkClosed();
         closeOldResultSet();
         sql = JdbcConnection.translateSQL(sql, escapeProcessing);
-        CommandInterface command = conn.prepareCommand(sql, fetchSize);
+        CommandInterface command = conn.prepareCommand(sql, fetchSize); // 解析 sql
         boolean lazy = false;
         boolean returnsResultSet;
         final Session session = this.session;

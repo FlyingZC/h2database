@@ -193,7 +193,7 @@ public class IndexCursor implements Cursor {
             if (intersects != null && index instanceof SpatialIndex) {
                 cursor = ((SpatialIndex) index).findByGeometry(session, first, last, reverse, intersects);
             } else if (index != null) {
-                cursor = index.find(session, first, last, reverse);
+                cursor = index.find(session, first, last, reverse); // 从 index 里获取 row, 比如 primary index
             }
         }
     }
@@ -347,7 +347,7 @@ public class IndexCursor implements Cursor {
                     return false;
                 }
             }
-            if (cursor.next()) {
+            if (cursor.next()) { // 获取下一行
                 return true;
             }
             cursor = null;
